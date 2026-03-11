@@ -3,6 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <!-- PWA / ホーム画面保存時のURLバー非表示設定 -->
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="AIWorkPad">
+    <meta name="theme-color" content="#ffffff">
+    <link rel="manifest" href='data:application/manifest+json;charset=utf-8,%7B%22name%22%3A%22AIWorkPad%22%2C%22short_name%22%3A%22AIWorkPad%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%23ffffff%22%2C%22theme_color%22%3A%22%23ffffff%22%7D'>
+    
     <title>AIWorkPad</title>
     <!-- Tailwind CSS with Typography Plugin -->
     <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
@@ -28,6 +36,17 @@
         }
     </script>
     <style>
+        /* モバイルでのキーボード表示時のレイアウト崩れ・ヘッダー見切れ防止 */
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            height: 100dvh;
+            overflow: hidden;
+            /* position: fixed; はiOS等でキーボード出現時に画面全体が押し上げられる原因になるため削除 */
+        }
+
         /* カスタムスクロールバー */
         .custom-scrollbar::-webkit-scrollbar,
         ::-webkit-scrollbar {
@@ -84,6 +103,7 @@
                 right: -100%;
                 width: 85%;
                 height: 100vh;
+                height: 100dvh;
                 z-index: 50;
                 transition: right 0.3s ease-in-out;
             }
@@ -108,19 +128,20 @@
         }
     </style>
 </head>
-<body class="bg-light text-slate-800 h-screen overflow-hidden flex flex-col font-sans">
+<body class="bg-light text-slate-800 flex flex-col font-sans">
 
     <!-- ヘッダー -->
-    <header class="bg-white border-b border-slate-200 shadow-sm px-4 py-3 flex justify-between items-center z-40 shrink-0">
-        <div class="flex items-center gap-2">
+    <header class="bg-white border-b border-slate-200 shadow-sm px-2 sm:px-4 py-3 flex justify-between items-center z-40 shrink-0">
+        <div class="flex items-center gap-1 sm:gap-2">
             <button id="btn-toggle-left-sidebar" class="text-slate-500 hover:text-primary transition p-2 rounded-full hover:bg-slate-100" title="ドキュメント一覧">
                 <i class="fa-solid fa-folder-tree"></i>
             </button>
-            <i class="fa-solid fa-pen-nib text-primary text-xl hidden sm:block"></i>
-            <h1 class="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-indigo-500 hidden sm:block">AIWorkPad</h1>
-            <span id="save-status" class="text-xs text-slate-400 ml-2"><i class="fa-solid fa-cloud"></i> 保存済</span>
+            <!-- アプリ名をスマホでも表示 -->
+            <i class="fa-solid fa-pen-nib text-primary text-base sm:text-xl"></i>
+            <h1 class="text-base sm:text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-indigo-500">AIWorkPad</h1>
+            <span id="save-status" class="text-[10px] sm:text-xs text-slate-400 ml-1 sm:ml-2 whitespace-nowrap"><i class="fa-solid fa-cloud"></i> 保存済</span>
         </div>
-        <div class="flex items-center gap-3">
+        <div class="flex items-center gap-1 sm:gap-3">
             <button id="btn-manual-save" class="text-slate-500 hover:text-primary transition p-2 rounded-full hover:bg-slate-100" title="手動保存">
                 <i class="fa-solid fa-save"></i>
             </button>
@@ -164,17 +185,17 @@
                 <input type="text" id="doc-title-input" class="w-full text-xl md:text-2xl font-bold text-slate-800 placeholder-slate-300 border-none focus:outline-none focus:ring-0 bg-transparent" placeholder="無題のドキュメント">
             </div>
 
-            <!-- Markdown入力支援ツールバー -->
-            <div class="shrink-0 px-4 md:px-8 py-2 bg-slate-50/50 border-b border-slate-200 flex items-center gap-1 overflow-x-auto custom-scrollbar">
-                <button class="toolbar-btn text-slate-500 hover:text-primary hover:bg-slate-200 p-1.5 md:p-2 rounded transition flex-shrink-0" data-md="h2" title="章タイトル (H2)"><i class="fa-solid fa-heading"></i></button>
-                <button class="toolbar-btn text-slate-500 hover:text-primary hover:bg-slate-200 p-1.5 md:p-2 rounded transition flex-shrink-0" data-md="bold" title="太字"><i class="fa-solid fa-bold"></i></button>
-                <button class="toolbar-btn text-slate-500 hover:text-primary hover:bg-slate-200 p-1.5 md:p-2 rounded transition flex-shrink-0" data-md="italic" title="斜体"><i class="fa-solid fa-italic"></i></button>
-                <div class="w-px h-5 bg-slate-300 mx-1 flex-shrink-0"></div>
-                <button class="toolbar-btn text-slate-500 hover:text-primary hover:bg-slate-200 p-1.5 md:p-2 rounded transition flex-shrink-0" data-md="list-ul" title="箇条書き"><i class="fa-solid fa-list-ul"></i></button>
+            <!-- Markdown入力支援ツールバー (スマホで横スクロールしないよう余白とテキストを削減) -->
+            <div class="shrink-0 px-2 sm:px-4 md:px-8 py-1.5 bg-slate-50/50 border-b border-slate-200 flex items-center gap-0.5 sm:gap-1 overflow-x-auto custom-scrollbar">
+                <button class="toolbar-btn text-slate-500 hover:text-primary hover:bg-slate-200 p-1 sm:p-1.5 md:p-2 rounded transition flex-shrink-0" data-md="h2" title="章タイトル (H2)"><i class="fa-solid fa-heading"></i></button>
+                <button class="toolbar-btn text-slate-500 hover:text-primary hover:bg-slate-200 p-1 sm:p-1.5 md:p-2 rounded transition flex-shrink-0" data-md="bold" title="太字"><i class="fa-solid fa-bold"></i></button>
+                <button class="toolbar-btn text-slate-500 hover:text-primary hover:bg-slate-200 p-1 sm:p-1.5 md:p-2 rounded transition flex-shrink-0" data-md="italic" title="斜体"><i class="fa-solid fa-italic"></i></button>
+                <div class="w-px h-5 bg-slate-300 mx-0.5 sm:mx-1 flex-shrink-0"></div>
+                <button class="toolbar-btn text-slate-500 hover:text-primary hover:bg-slate-200 p-1 sm:p-1.5 md:p-2 rounded transition flex-shrink-0" data-md="list-ul" title="箇条書き"><i class="fa-solid fa-list-ul"></i></button>
                 
                 <div class="flex items-center flex-shrink-0">
-                    <button class="toolbar-btn text-slate-500 hover:text-primary hover:bg-slate-200 p-1.5 md:p-2 rounded-l transition" data-md="list-ol" title="番号付きリスト"><i class="fa-solid fa-list-ol"></i></button>
-                    <select id="ol-type-select" class="bg-slate-100 text-slate-500 text-xs focus:outline-none p-1.5 border-l border-slate-200 rounded-r cursor-pointer hover:bg-slate-200 transition" title="項番の種類">
+                    <button class="toolbar-btn text-slate-500 hover:text-primary hover:bg-slate-200 p-1 sm:p-1.5 md:p-2 rounded-l transition" data-md="list-ol" title="番号付きリスト"><i class="fa-solid fa-list-ol"></i></button>
+                    <select id="ol-type-select" class="bg-slate-100 text-slate-500 text-xs focus:outline-none py-1 sm:py-1.5 px-0.5 sm:px-1 border-l border-slate-200 rounded-r cursor-pointer hover:bg-slate-200 transition" title="項番の種類">
                         <option value="1">1.</option>
                         <option value="A">A.</option>
                         <option value="a">a.</option>
@@ -183,15 +204,16 @@
                     </select>
                 </div>
 
-                <div class="w-px h-5 bg-slate-300 mx-1 flex-shrink-0"></div>
-                <button class="toolbar-btn text-slate-500 hover:text-primary hover:bg-slate-200 p-1.5 md:p-2 rounded transition flex-shrink-0" data-md="quote" title="引用"><i class="fa-solid fa-quote-right"></i></button>
-                <button class="toolbar-btn text-slate-500 hover:text-primary hover:bg-slate-200 p-1.5 md:p-2 rounded transition flex-shrink-0" data-md="code" title="コード"><i class="fa-solid fa-code"></i></button>
-                <button class="toolbar-btn text-slate-500 hover:text-primary hover:bg-slate-200 p-1.5 md:p-2 rounded transition flex-shrink-0" data-md="link" title="リンク"><i class="fa-solid fa-link"></i></button>
+                <div class="w-px h-5 bg-slate-300 mx-0.5 sm:mx-1 flex-shrink-0"></div>
+                <button class="toolbar-btn text-slate-500 hover:text-primary hover:bg-slate-200 p-1 sm:p-1.5 md:p-2 rounded transition flex-shrink-0" data-md="quote" title="引用"><i class="fa-solid fa-quote-right"></i></button>
+                <button class="toolbar-btn text-slate-500 hover:text-primary hover:bg-slate-200 p-1 sm:p-1.5 md:p-2 rounded transition flex-shrink-0" data-md="code" title="コード"><i class="fa-solid fa-code"></i></button>
+                <button class="toolbar-btn text-slate-500 hover:text-primary hover:bg-slate-200 p-1 sm:p-1.5 md:p-2 rounded transition flex-shrink-0" data-md="link" title="リンク"><i class="fa-solid fa-link"></i></button>
                 
-                <div class="flex-1 min-w-[10px]"></div>
+                <div class="flex-1 min-w-[2px]"></div>
                 
-                <button id="btn-toggle-preview" class="text-slate-500 hover:text-primary hover:bg-primary/10 px-3 py-1.5 rounded transition text-sm font-medium flex items-center gap-1 whitespace-nowrap flex-shrink-0 shadow-sm border border-slate-200 bg-white">
-                    <i class="fa-solid fa-eye"></i> プレビュー
+                <!-- プレビュー文字を削除しアイコンのみに -->
+                <button id="btn-toggle-preview" class="text-slate-500 hover:text-primary hover:bg-primary/10 p-1 sm:p-1.5 md:p-2 rounded transition flex items-center justify-center flex-shrink-0 shadow-sm border border-slate-200 bg-white" title="プレビュー">
+                    <i class="fa-solid fa-eye"></i> 
                 </button>
             </div>
 
@@ -353,6 +375,17 @@
     <div id="toast-container" class="fixed top-4 right-4 z-[60] flex flex-col gap-2 w-72 pointer-events-none"></div>
 
     <script>
+        // モバイルでのキーボード表示時のViewport高さ調整 (ヘッダー見切れ防止)
+        if (window.visualViewport) {
+            const adjustViewport = () => {
+                document.body.style.height = window.visualViewport.height + 'px';
+                if (document.body.scrollTop > 0) window.scrollTo(0, 0);
+            };
+            window.visualViewport.addEventListener('resize', adjustViewport);
+            window.visualViewport.addEventListener('scroll', () => window.scrollTo(0, 0));
+            adjustViewport();
+        }
+
         // ==========================================
         // 定数・初期設定・ヘルパー
         // ==========================================
@@ -452,7 +485,7 @@
                 }, 1000);
             });
 
-            // エディタのEnterキーによる自動連番 (項番の増分)
+            // エディタのEnterキーによる自動連番
             editor.addEventListener('keydown', (e) => {
                 if (e.key === 'Enter') {
                     const cursor = editor.selectionStart;
@@ -513,7 +546,6 @@
                         editor.selectionStart = editor.selectionEnd = cursor + nextPrefix.length;
                         editor.dispatchEvent(new Event('input'));
                         
-                        // 自動スクロール
                         const lineHeight = parseInt(window.getComputedStyle(editor).lineHeight);
                         editor.scrollTop = (lines.length) * lineHeight;
                     }
@@ -522,7 +554,7 @@
 
             // Markdown入力支援ツールバー
             document.querySelectorAll('.toolbar-btn').forEach(btn => {
-                btn.addEventListener('mousedown', e => e.preventDefault()); // フォーカスを奪わない
+                btn.addEventListener('mousedown', e => e.preventDefault());
                 btn.addEventListener('click', (e) => {
                     const type = e.currentTarget.dataset.md;
                     applyMarkdownFormat(type);
@@ -662,29 +694,28 @@
         function togglePreviewMode() {
             const isPreview = !editorPreview.classList.contains('hidden');
             if (isPreview) {
-                // 編集モードに戻る
                 editorPreview.classList.add('hidden');
                 editor.classList.remove('hidden');
-                btnTogglePreview.innerHTML = '<i class="fa-solid fa-eye"></i> プレビュー';
+                btnTogglePreview.innerHTML = '<i class="fa-solid fa-eye"></i>';
+                btnTogglePreview.title = 'プレビュー';
                 btnTogglePreview.classList.remove('bg-primary/10', 'text-primary');
                 editor.focus();
             } else {
-                // プレビューモードにする (WYSIWYGライク)
                 editor.classList.add('hidden');
                 editorPreview.classList.remove('hidden');
-                btnTogglePreview.innerHTML = '<i class="fa-solid fa-pen"></i> 編集に戻る';
+                btnTogglePreview.innerHTML = '<i class="fa-solid fa-pen"></i>';
+                btnTogglePreview.title = '編集に戻る';
                 btnTogglePreview.classList.add('bg-primary/10', 'text-primary');
                 
-                // タイトルも含めてプレビューする
                 const titleMarkdown = docTitleInput.value.trim() ? `# ${docTitleInput.value.trim()}\n\n` : '';
                 editorPreview.innerHTML = marked.parse(titleMarkdown + (editor.value || '*何も書かれていません*'));
-                hideActionSheet(); // プレビュー中はAIメニューを隠す
+                hideActionSheet();
             }
         }
 
         function applyMarkdownFormat(type) {
             if (editorPreview.classList.contains('hidden') === false) {
-                togglePreviewMode(); // プレビュー中なら編集モードに戻す
+                togglePreviewMode();
             }
 
             const start = editor.selectionStart;
@@ -859,9 +890,7 @@
         }
 
         function insertTextAtCursor(text) {
-            if (!editorPreview.classList.contains('hidden')) {
-                togglePreviewMode(); 
-            }
+            if (!editorPreview.classList.contains('hidden')) togglePreviewMode(); 
             const cursorPos = editor.selectionStart;
             const textBefore = editor.value.substring(0, cursorPos);
             const textAfter = editor.value.substring(cursorPos, editor.value.length);
@@ -1181,9 +1210,7 @@
             await saveDocument();
             await saveVersion('init', '初期作成');
             
-            if (!editorPreview.classList.contains('hidden')) {
-                togglePreviewMode(); 
-            }
+            if (!editorPreview.classList.contains('hidden')) togglePreviewMode(); 
             
             updateTOC();
             await loadHistory();
@@ -1226,7 +1253,6 @@
                 const isActive = doc.id === currentDocId;
                 div.className = `p-2 rounded cursor-pointer text-sm flex justify-between items-center group transition ${isActive ? 'bg-primary/10 text-primary font-bold' : 'text-slate-600 hover:bg-slate-100'}`;
                 
-                // モバイルでも削除ボタンにアクセスしやすいように、opacity クラスを調整
                 div.innerHTML = `
                     <div class="truncate flex-1 btn-switch-doc pr-2">
                         <i class="fa-regular fa-file-lines mr-2 ${isActive ? 'text-primary' : 'text-slate-400'}"></i>${doc.title}
@@ -1315,7 +1341,7 @@
         }
 
         function updateSaveStatus(text, colorClass, iconClass) {
-            saveStatus.className = `text-xs ml-2 ${colorClass}`;
+            saveStatus.className = `text-[10px] sm:text-xs ml-1 sm:ml-2 whitespace-nowrap ${colorClass}`;
             saveStatus.innerHTML = `<i class="fa-solid ${iconClass}"></i> ${text}`;
         }
 
@@ -1400,9 +1426,7 @@
                         updateTOC();
                         showToast('バージョンを復元しました', 'success');
                         
-                        if (!editorPreview.classList.contains('hidden')) {
-                            togglePreviewMode(); 
-                        }
+                        if (!editorPreview.classList.contains('hidden')) togglePreviewMode(); 
                         if(window.innerWidth <= 768) document.getElementById('btn-toggle-sidebar').click();
                     }
                 });
