@@ -52,16 +52,51 @@
             font-size: 16px;
         }
         
-        /* アクションシートのアニメーション */
+        /* アクションシートのアニメーションとレスポンシブ対応 */
         .slide-up {
-            transform: translateY(100%);
-            transition: transform 0.3s ease-out;
+            transform: translateY(150%);
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
         .slide-up.active {
             transform: translateY(0);
         }
 
-        /* サイドパネルのアニメーション (モバイル用) */
+        /* PC向け アクションシートのポップオーバー化 */
+        @media (min-width: 769px) {
+            #ai-action-sheet {
+                width: 500px;
+                left: 50%;
+                margin-left: -250px; /* widthの半分 */
+                bottom: 24px;
+                border-radius: 0.75rem;
+                border: 1px solid #e2e8f0;
+                box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1);
+            }
+        }
+
+        /* 左サイドバー(ドキュメント一覧)のアニメーション */
+        #left-sidebar {
+            transition: margin-left 0.3s ease, transform 0.3s ease;
+        }
+        @media (max-width: 768px) {
+            #left-sidebar {
+                transform: translateX(-100%);
+                margin-left: 0 !important;
+            }
+            #left-sidebar.open-mobile {
+                transform: translateX(0);
+            }
+        }
+        @media (min-width: 769px) {
+            #left-sidebar {
+                transform: translateX(0) !important;
+            }
+            #left-sidebar.closed-pc {
+                margin-left: -16rem; /* Tailwindのw-64に相当 */
+            }
+        }
+
+        /* 右サイドパネルのアニメーション (モバイル用) */
         @media (max-width: 768px) {
             #sidebar {
                 position: fixed;
@@ -98,16 +133,19 @@
     <!-- ヘッダー -->
     <header class="bg-white border-b border-slate-200 shadow-sm px-4 py-3 flex justify-between items-center z-40 shrink-0">
         <div class="flex items-center gap-2">
-            <i class="fa-solid fa-pen-nib text-primary text-xl"></i>
-            <h1 class="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-indigo-500">AIWorkPad</h1>
+            <button id="btn-toggle-left-sidebar" class="text-slate-500 hover:text-primary transition p-2 rounded-full hover:bg-slate-100" title="ドキュメント一覧">
+                <i class="fa-solid fa-folder-tree"></i>
+            </button>
+            <i class="fa-solid fa-pen-nib text-primary text-xl hidden sm:block"></i>
+            <h1 class="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-indigo-500 hidden sm:block">AIWorkPad</h1>
             <span id="save-status" class="text-xs text-slate-400 ml-2"><i class="fa-solid fa-cloud"></i> 保存済</span>
         </div>
         <div class="flex items-center gap-3">
             <button id="btn-manual-save" class="text-slate-500 hover:text-primary transition p-2 rounded-full hover:bg-slate-100" title="手動保存">
                 <i class="fa-solid fa-save"></i>
             </button>
-            <button id="btn-toggle-sidebar" class="text-slate-500 hover:text-primary transition p-2 rounded-full hover:bg-slate-100 md:hidden">
-                <i class="fa-solid fa-bars"></i>
+            <button id="btn-toggle-sidebar" class="text-slate-500 hover:text-primary transition p-2 rounded-full hover:bg-slate-100 md:hidden" title="ツールパネル">
+                <i class="fa-solid fa-screwdriver-wrench"></i>
             </button>
         </div>
     </header>
@@ -115,12 +153,32 @@
     <!-- メインコンテンツ -->
     <div class="flex-1 flex overflow-hidden relative">
         
+        <!-- 左サイドバーオーバーレイ (モバイル用) -->
+        <div id="left-sidebar-overlay" class="fixed inset-0 bg-black/50 z-40 hidden md:hidden"></div>
+
+        <!-- 左サイドバー (ドキュメント一覧) -->
+        <aside id="left-sidebar" class="w-64 bg-slate-50 border-r border-slate-200 flex flex-col shrink-0 absolute md:relative h-full z-50">
+            <div class="p-3 border-b border-slate-200 flex justify-between items-center bg-white">
+                <span class="font-bold text-slate-700 text-sm"><i class="fa-solid fa-file-lines mr-1 text-primary"></i> ドキュメント</span>
+                <button id="btn-new-doc" class="text-slate-400 hover:text-primary transition p-1" title="新規ドキュメント作成">
+                    <i class="fa-solid fa-plus"></i>
+                </button>
+            </div>
+            <div id="doc-list" class="flex-1 overflow-y-auto p-2 space-y-1">
+                <!-- ドキュメントリストがJavaScriptで生成されます -->
+            </div>
+            <!-- モバイル用 左パネル閉じるボタン -->
+            <button id="btn-close-left-sidebar" class="md:hidden p-3 bg-slate-200 text-center font-bold text-slate-600 text-sm border-t border-slate-300">
+                閉じる
+            </button>
+        </aside>
+
         <!-- エディタエリア -->
         <main class="flex-1 flex flex-col relative bg-white h-full">
             <textarea id="editor" class="w-full h-full p-4 md:p-8 bg-transparent" placeholder="ここから文章を書き始めましょう... (Markdown対応)&#10;テキストを選択するとAIメニューが表示されます。"></textarea>
             
-            <!-- スマホ用 AIアクションシート -->
-            <div id="ai-action-sheet" class="slide-up absolute bottom-0 left-0 w-full bg-white border-t border-slate-200 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] z-30 pb-safe rounded-t-xl">
+            <!-- AIアクションシート (スマホ:下部固定, PC:ポップオーバー) -->
+            <div id="ai-action-sheet" class="slide-up absolute bottom-0 left-0 w-full bg-white border-t border-slate-200 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] z-30 pb-safe rounded-t-xl md:rounded-b-xl md:border">
                 <div class="p-3">
                     <div class="flex justify-between items-center mb-2 px-2">
                         <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">AIアシスタント</span>
@@ -152,10 +210,10 @@
             </div>
         </main>
 
-        <!-- モバイル用 サイドパネルオーバーレイ -->
+        <!-- モバイル用 右サイドパネルオーバーレイ -->
         <div id="sidebar-overlay" class="fixed inset-0 bg-black/50 z-40"></div>
 
-        <!-- サイドパネル -->
+        <!-- 右サイドパネル (目次・調査・履歴) -->
         <aside id="sidebar" class="w-80 bg-slate-50 border-l border-slate-200 flex flex-col shrink-0 shadow-xl md:shadow-none md:static md:right-auto md:h-auto">
             <!-- タブナビゲーション -->
             <div class="flex border-b border-slate-200 bg-white">
@@ -245,14 +303,17 @@
         const tocList = document.getElementById('toc-list');
         const historyList = document.getElementById('history-list');
         const researchList = document.getElementById('research-list');
+        const docListEl = document.getElementById('doc-list');
         
         // State
+        let currentDocId = null;
         let currentContent = "";
         let selectionRange = { start: 0, end: 0, text: "" };
         let isProcessing = false;
         let typingTimer;
         
         // DB Stores (localForage)
+        const dbDocList = localforage.createInstance({ name: "AIWorkPad", storeName: "docList" });
         const dbDoc = localforage.createInstance({ name: "AIWorkPad", storeName: "document" });
         const dbHistory = localforage.createInstance({ name: "AIWorkPad", storeName: "history" });
         const dbResearch = localforage.createInstance({ name: "AIWorkPad", storeName: "research" });
@@ -262,10 +323,7 @@
         // ==========================================
         async function init() {
             setupEventListeners();
-            await loadDocument();
-            await loadHistory();
-            await loadResearchNotes();
-            updateTOC();
+            await loadDocumentList();
             
             // 定期的なバージョン保存
             setInterval(() => {
@@ -303,16 +361,38 @@
                 });
             });
 
-            // サイドパネル（モバイル）トグル
-            const sidebar = document.getElementById('sidebar');
-            const overlay = document.getElementById('sidebar-overlay');
-            const toggleSidebar = () => {
-                sidebar.classList.toggle('open');
-                overlay.classList.toggle('open');
+            // 左サイドバー（ドキュメント一覧）トグル
+            const toggleLeftSidebar = () => {
+                const sidebar = document.getElementById('left-sidebar');
+                const overlay = document.getElementById('left-sidebar-overlay');
+                if (window.innerWidth > 768) {
+                    sidebar.classList.toggle('closed-pc');
+                } else {
+                    const isOpen = sidebar.classList.toggle('open-mobile');
+                    if (isOpen) {
+                        overlay.classList.remove('hidden');
+                    } else {
+                        overlay.classList.add('hidden');
+                    }
+                }
             };
-            document.getElementById('btn-toggle-sidebar').addEventListener('click', toggleSidebar);
-            document.getElementById('btn-close-sidebar-mobile').addEventListener('click', toggleSidebar);
-            overlay.addEventListener('click', toggleSidebar);
+            document.getElementById('btn-toggle-left-sidebar').addEventListener('click', toggleLeftSidebar);
+            document.getElementById('btn-close-left-sidebar').addEventListener('click', toggleLeftSidebar);
+            document.getElementById('left-sidebar-overlay').addEventListener('click', toggleLeftSidebar);
+
+            // 新規ドキュメント作成
+            document.getElementById('btn-new-doc').addEventListener('click', createNewDocument);
+
+            // 右サイドパネル（モバイル）トグル
+            const rightSidebar = document.getElementById('sidebar');
+            const rightOverlay = document.getElementById('sidebar-overlay');
+            const toggleRightSidebar = () => {
+                rightSidebar.classList.toggle('open');
+                rightOverlay.classList.toggle('open');
+            };
+            document.getElementById('btn-toggle-sidebar').addEventListener('click', toggleRightSidebar);
+            document.getElementById('btn-close-sidebar-mobile').addEventListener('click', toggleRightSidebar);
+            rightOverlay.addEventListener('click', toggleRightSidebar);
 
             // タブ切り替え
             document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -340,10 +420,16 @@
             document.getElementById('btn-cancel-research').addEventListener('click', hideResearchModal);
             document.getElementById('btn-execute-research').addEventListener('click', executeResearch);
 
-            // 調査ノートクリア
+            // 調査ノートクリア（現在のドキュメントのノートのみ）
             document.getElementById('btn-clear-research').addEventListener('click', async () => {
-                if(confirm('すべての調査ノートを削除しますか？')) {
-                    await dbResearch.clear();
+                if(confirm('このドキュメントの調査ノートをすべて削除しますか？')) {
+                    const keys = await dbResearch.keys();
+                    for (let key of keys) {
+                        const item = await dbResearch.getItem(key);
+                        if(item.docId === currentDocId) {
+                            await dbResearch.removeItem(key);
+                        }
+                    }
                     await loadResearchNotes();
                     showToast('調査ノートをクリアしました', 'success');
                 }
@@ -354,7 +440,6 @@
         // エディタ・テキスト選択ロジック
         // ==========================================
         function handleSelection() {
-            // アクティブな要素がエディタの場合のみ処理
             if (document.activeElement === editor) {
                 const start = editor.selectionStart;
                 const end = editor.selectionEnd;
@@ -370,7 +455,7 @@
         }
 
         function showActionSheet() {
-            if (isProcessing) return; // 処理中は表示しない
+            if (isProcessing) return;
             aiActionSheet.classList.add('active');
         }
 
@@ -378,7 +463,16 @@
             aiActionSheet.classList.remove('active');
         }
 
-        // 目次の抽出と更新
+        function extractTitle(text) {
+            const lines = text.split('\n');
+            for (let line of lines) {
+                const trimmed = line.trim();
+                if (trimmed.startsWith('# ')) return trimmed.replace(/^#\s*/, '').substring(0, 30);
+                if (trimmed.length > 0) return trimmed.substring(0, 30);
+            }
+            return '無題のドキュメント';
+        }
+
         function updateTOC() {
             const text = editor.value;
             const lines = text.split('\n');
@@ -426,7 +520,6 @@
             editor.focus();
             editor.setSelectionRange(charCount, charCount);
             
-            // スクロール位置の大雑把な計算 (完璧ではないが実用的)
             const lineHeight = parseInt(window.getComputedStyle(editor).lineHeight);
             editor.scrollTop = lineIndex * lineHeight;
         }
@@ -479,11 +572,9 @@
             isProcessing = true;
             const toastId = showToast(`${actionName}のAI処理を実行中...`, 'info', true);
             
-            // 処理前のバージョンを保存
             await saveVersion('ai', `AI処理前 (${actionName})`);
 
             try {
-                // Cloudflare Workerへのリクエスト
                 const res = await fetch(WORKER_URL, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -493,7 +584,6 @@
                 if (!res.ok) throw new Error('API通信エラー');
 
                 let resultText = '';
-                // レスポンスの解析 (JSONかTextか柔軟に対応)
                 const contentType = res.headers.get("content-type");
                 if (contentType && contentType.indexOf("application/json") !== -1) {
                     const data = await res.json();
@@ -505,22 +595,19 @@
                 removeToast(toastId);
 
                 if (mode === 'replace') {
-                    // エディタの選択範囲を置換
                     const before = editor.value.substring(0, selectionRange.start);
                     const after = editor.value.substring(selectionRange.end);
                     editor.value = before + resultText + after;
                     
-                    // イベントを発火させて保存とTOC更新をトリガー
                     editor.dispatchEvent(new Event('input'));
                     showToast(`${actionName}を適用しました`, 'success');
                     
-                    // 置換後の範囲を選択状態にする
                     editor.setSelectionRange(selectionRange.start, selectionRange.start + resultText.length);
                     
                 } else if (mode === 'research') {
-                    // 調査結果を保存
                     const note = {
                         id: Date.now().toString(),
+                        docId: currentDocId,
                         timestamp: new Date().toISOString(),
                         sourceText: selectionRange.text,
                         content: resultText
@@ -528,9 +615,7 @@
                     await dbResearch.setItem(note.id, note);
                     await loadResearchNotes();
                     
-                    // タブを切り替え
                     document.querySelector('[data-target="tab-research"]').click();
-                    
                     showToast(`調査結果をノートに保存しました`, 'success');
                 }
 
@@ -544,26 +629,169 @@
         }
 
         // ==========================================
-        // データ管理・バージョン管理ロジック
+        // データ管理・複数ドキュメントロジック
         // ==========================================
-        async function loadDocument() {
-            const doc = await dbDoc.getItem('main');
-            if (doc) {
-                editor.value = doc.content;
-                currentContent = doc.content;
-                updateSaveStatus("保存済", "text-slate-400", "fa-cloud");
+        async function loadDocumentList() {
+            let list = await dbDocList.getItem('list') || [];
+            
+            // 下位互換性 (旧バージョンの単一 main ドキュメントの移行)
+            const oldMain = await dbDoc.getItem('main');
+            if (oldMain && list.length === 0) {
+                const newId = 'doc_' + Date.now();
+                list.push({ id: newId, title: extractTitle(oldMain.content), updatedAt: Date.now() });
+                await dbDoc.setItem(newId, { id: newId, content: oldMain.content, lastModified: oldMain.lastModified });
+                await dbDocList.setItem('list', list);
+                await dbDoc.removeItem('main');
+                currentDocId = newId;
+            } else if (list.length === 0) {
+                const initDoc = { id: 'doc_' + Date.now(), title: '無題のドキュメント', updatedAt: Date.now() };
+                list.push(initDoc);
+                await dbDocList.setItem('list', list);
+                currentDocId = initDoc.id;
             } else {
-                await saveDocument();
-                await saveVersion('init', '初期作成');
+                if (!currentDocId || !list.find(d => d.id === currentDocId)) {
+                    currentDocId = list[0].id;
+                }
+            }
+            
+            renderDocList(list);
+            await loadDocument();
+        }
+
+        async function createNewDocument() {
+            await saveDocument(); // 現在のものを保存
+            let list = await dbDocList.getItem('list') || [];
+            const newId = 'doc_' + Date.now();
+            list.push({ id: newId, title: '無題のドキュメント', updatedAt: Date.now() });
+            await dbDocList.setItem('list', list);
+            
+            currentDocId = newId;
+            editor.value = '';
+            currentContent = '';
+            
+            renderDocList(list);
+            await saveDocument();
+            await saveVersion('init', '初期作成');
+            updateTOC();
+            await loadHistory();
+            await loadResearchNotes();
+
+            // モバイルの場合は作成後にメニューを閉じる
+            if (window.innerWidth <= 768) {
+                document.getElementById('btn-close-left-sidebar').click();
             }
         }
 
+        async function deleteDocument(id) {
+            let list = await dbDocList.getItem('list') || [];
+            list = list.filter(d => d.id !== id);
+            await dbDocList.setItem('list', list);
+            await dbDoc.removeItem(id);
+            
+            // 紐づく履歴と調査ノートの削除
+            const hKeys = await dbHistory.keys();
+            for(let k of hKeys) {
+                const item = await dbHistory.getItem(k);
+                if(item.docId === id) await dbHistory.removeItem(k);
+            }
+            const rKeys = await dbResearch.keys();
+            for(let k of rKeys) {
+                const item = await dbResearch.getItem(k);
+                if(item.docId === id) await dbResearch.removeItem(k);
+            }
+
+            if (list.length === 0) {
+                await createNewDocument();
+            } else {
+                currentDocId = list[0].id;
+                renderDocList(list);
+                await loadDocument();
+            }
+        }
+
+        function renderDocList(list) {
+            docListEl.innerHTML = '';
+            list.sort((a, b) => b.updatedAt - a.updatedAt);
+            
+            list.forEach(doc => {
+                const div = document.createElement('div');
+                const isActive = doc.id === currentDocId;
+                div.className = `p-2 rounded cursor-pointer text-sm flex justify-between items-center group transition ${isActive ? 'bg-primary/10 text-primary font-bold' : 'text-slate-600 hover:bg-slate-100'}`;
+                
+                div.innerHTML = `
+                    <div class="truncate flex-1 btn-switch-doc pr-2">
+                        <i class="fa-regular fa-file-lines mr-2 ${isActive ? 'text-primary' : 'text-slate-400'}"></i>${doc.title}
+                    </div>
+                    <button class="btn-delete-doc text-slate-300 hover:text-red-500 px-2 opacity-0 group-hover:opacity-100 transition ${isActive ? '' : 'hidden'}" title="削除">
+                        <i class="fa-solid fa-trash"></i>
+                    </button>
+                `;
+                
+                div.querySelector('.btn-switch-doc').addEventListener('click', async () => {
+                    if (currentDocId !== doc.id) {
+                        await saveDocument(); 
+                        currentDocId = doc.id;
+                        renderDocList(await dbDocList.getItem('list'));
+                        await loadDocument();
+                        if (window.innerWidth <= 768) {
+                            document.getElementById('btn-close-left-sidebar').click();
+                        }
+                    }
+                });
+                
+                const deleteBtn = div.querySelector('.btn-delete-doc');
+                if (deleteBtn) {
+                    deleteBtn.addEventListener('click', async (e) => {
+                        e.stopPropagation();
+                        if (confirm(`「${doc.title}」を削除しますか？`)) {
+                            await deleteDocument(doc.id);
+                        }
+                    });
+                }
+                docListEl.appendChild(div);
+            });
+        }
+
+        async function loadDocument() {
+            if (!currentDocId) return;
+            const doc = await dbDoc.getItem(currentDocId);
+            if (doc) {
+                editor.value = doc.content || '';
+                currentContent = doc.content || '';
+                updateSaveStatus("保存済", "text-slate-400", "fa-cloud-check");
+            } else {
+                editor.value = '';
+                currentContent = '';
+                await saveDocument();
+                await saveVersion('init', '初期作成');
+            }
+            updateTOC();
+            await loadHistory();
+            await loadResearchNotes();
+        }
+
         async function saveDocument() {
+            if (!currentDocId) return;
+            const content = editor.value;
             const doc = {
-                content: editor.value,
+                id: currentDocId,
+                content: content,
                 lastModified: new Date().toISOString()
             };
-            await dbDoc.setItem('main', doc);
+            await dbDoc.setItem(currentDocId, doc);
+            
+            // リストのタイトル更新
+            let list = await dbDocList.getItem('list') || [];
+            const docMeta = list.find(d => d.id === currentDocId);
+            if (docMeta) {
+                const newTitle = extractTitle(content);
+                if (docMeta.title !== newTitle) {
+                    docMeta.title = newTitle;
+                    docMeta.updatedAt = Date.now();
+                    await dbDocList.setItem('list', list);
+                    renderDocList(list);
+                }
+            }
             updateSaveStatus("保存済", "text-slate-400", "fa-cloud-check");
         }
 
@@ -573,11 +801,13 @@
         }
 
         async function saveVersion(reason, description) {
+            if (!currentDocId) return;
             const content = editor.value;
             if(!content) return;
 
             const version = {
                 id: Date.now().toString(),
+                docId: currentDocId,
                 timestamp: new Date().toISOString(),
                 content: content,
                 reason: reason,
@@ -592,9 +822,12 @@
             const keys = await dbHistory.keys();
             const versions = [];
             for (let key of keys) {
-                versions.push(await dbHistory.getItem(key));
+                const item = await dbHistory.getItem(key);
+                // docIdがないものは過去の互換性のため表示（または無視）、今回は一致のみ
+                if (item.docId === currentDocId || !item.docId) {
+                    versions.push(item);
+                }
             }
-            // 新しい順にソート
             versions.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 
             historyList.innerHTML = '';
@@ -626,7 +859,7 @@
                     </button>
                 `;
                 
-                el.querySelector('.btn-restore').addEventListener('click', async (e) => {
+                el.querySelector('.btn-restore').addEventListener('click', async () => {
                     if(confirm('現在の状態を上書きして、このバージョンを復元しますか？（現在の状態は自動保存されます）')) {
                         await saveVersion('auto', '復元前のバックアップ');
                         editor.value = v.content;
@@ -635,7 +868,6 @@
                         updateTOC();
                         showToast('バージョンを復元しました', 'success');
                         
-                        // スマホの場合はパネルを閉じる
                         if(window.innerWidth <= 768) {
                             document.getElementById('btn-toggle-sidebar').click();
                         }
@@ -650,7 +882,10 @@
             const keys = await dbResearch.keys();
             const notes = [];
             for (let key of keys) {
-                notes.push(await dbResearch.getItem(key));
+                const item = await dbResearch.getItem(key);
+                if (item.docId === currentDocId || !item.docId) {
+                    notes.push(item);
+                }
             }
             notes.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 
@@ -667,7 +902,6 @@
                 const el = document.createElement('div');
                 el.className = 'bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex flex-col gap-2';
                 
-                // Markdownの簡易レンダリング (marked.js)
                 const htmlContent = marked.parse(note.content);
 
                 el.innerHTML = `
@@ -731,7 +965,6 @@
 
             toast.className = `toast-enter ${bgClass} px-4 py-3 rounded-lg shadow-lg flex items-center gap-3 pointer-events-auto`;
             
-            // スピナーアイコン
             const iconHtml = isPersistent ? `<i class="fa-solid fa-circle-notch fa-spin"></i>` : `<i class="fa-solid ${icon}"></i>`;
 
             toast.innerHTML = `
