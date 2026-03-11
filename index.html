@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>AIWorkPad</title>
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Tailwind CSS with Typography Plugin -->
+    <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
     <!-- FontAwesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- LocalForage (IndexedDB Wrapper) -->
@@ -29,25 +29,27 @@
     </script>
     <style>
         /* カスタムスクロールバー */
+        .custom-scrollbar::-webkit-scrollbar,
         ::-webkit-scrollbar {
             width: 6px;
             height: 6px;
         }
+        .custom-scrollbar::-webkit-scrollbar-track,
         ::-webkit-scrollbar-track {
             background: transparent;
         }
+        .custom-scrollbar::-webkit-scrollbar-thumb,
         ::-webkit-scrollbar-thumb {
             background: #cbd5e1;
             border-radius: 4px;
         }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover,
         ::-webkit-scrollbar-thumb:hover {
             background: #94a3b8;
         }
         
         /* エディタのスタイル調整 */
         #editor {
-            resize: none;
-            outline: none;
             line-height: 1.8;
             font-size: 16px;
         }
@@ -119,8 +121,11 @@
             <span id="save-status" class="text-xs text-slate-400 ml-2"><i class="fa-solid fa-cloud"></i> 保存済</span>
         </div>
         <div class="flex items-center gap-3">
-            <button id="btn-manual-save" class="text-slate-500 hover:text-primary transition p-2 rounded-full hover:bg-slate-100" title="手局保存">
+            <button id="btn-manual-save" class="text-slate-500 hover:text-primary transition p-2 rounded-full hover:bg-slate-100" title="手動保存">
                 <i class="fa-solid fa-save"></i>
+            </button>
+            <button id="btn-settings" class="text-slate-500 hover:text-primary transition p-2 rounded-full hover:bg-slate-100" title="設定">
+                <i class="fa-solid fa-gear"></i>
             </button>
             <button id="btn-toggle-sidebar" class="text-slate-500 hover:text-primary transition p-2 rounded-full hover:bg-slate-100 md:hidden" title="ツールパネル">
                 <i class="fa-solid fa-screwdriver-wrench"></i>
@@ -142,7 +147,7 @@
                     <i class="fa-solid fa-plus"></i>
                 </button>
             </div>
-            <div id="doc-list" class="flex-1 overflow-y-auto p-2 space-y-1">
+            <div id="doc-list" class="flex-1 overflow-y-auto p-2 space-y-1 custom-scrollbar">
                 <!-- ドキュメントリストがJavaScriptで生成されます -->
             </div>
             <!-- モバイル用 左パネル閉じるボタン -->
@@ -152,32 +157,65 @@
         </aside>
 
         <!-- エディタエリア -->
-        <main class="flex-1 flex flex-col relative bg-white h-full">
-            <textarea id="editor" class="w-full h-full p-4 md:p-8 bg-transparent" placeholder="ここから文章を書き始めましょう... (Markdown対応)&#10;テキストを選択するとAIメニューが表示されます。"></textarea>
+        <main class="flex-1 flex flex-col relative bg-white h-full overflow-hidden">
             
-            <!-- AIアクションシート (モダンなフローティングメニュー) -->
-            <div id="ai-action-sheet" class="fixed bg-white border border-slate-200 shadow-xl z-50 rounded-lg p-2 transition-opacity duration-200 opacity-0 pointer-events-none hidden" style="width: max-content;">
-                <div class="flex items-center justify-between mb-1 px-1 border-b border-slate-100 pb-1">
-                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">AIメニュー</span>
-                    <button id="btn-close-actions" class="text-slate-300 hover:text-slate-500 p-1"><i class="fa-solid fa-times text-xs"></i></button>
-                </div>
-                <div class="flex gap-1">
-                    <button class="ai-action-btn flex flex-col items-center p-2 rounded hover:bg-blue-50 text-primary transition min-w-[50px]" data-action="clean">
-                        <i class="fa-solid fa-broom text-sm mb-1"></i><span class="text-[9px] font-medium whitespace-nowrap">きれい化</span>
-                    </button>
-                    <button class="ai-action-btn flex flex-col items-center p-2 rounded hover:bg-blue-50 text-primary transition min-w-[50px]" data-action="summarize">
-                        <i class="fa-solid fa-compress text-sm mb-1"></i><span class="text-[9px] font-medium whitespace-nowrap">要約</span>
-                    </button>
-                    <button class="ai-action-btn flex flex-col items-center p-2 rounded hover:bg-blue-50 text-primary transition min-w-[50px]" data-action="refine">
-                        <i class="fa-solid fa-wand-magic-sparkles text-sm mb-1"></i><span class="text-[9px] font-medium whitespace-nowrap">表現修整</span>
-                    </button>
-                    <button class="ai-action-btn flex flex-col items-center p-2 rounded hover:bg-blue-50 text-primary transition min-w-[50px]" data-action="structure">
-                        <i class="fa-solid fa-list-ul text-sm mb-1"></i><span class="text-[9px] font-medium whitespace-nowrap">構造化</span>
-                    </button>
-                    <div class="w-px bg-slate-200 mx-1"></div>
-                    <button class="ai-action-btn flex flex-col items-center p-2 rounded hover:bg-blue-50 text-primary transition min-w-[50px]" data-action="research">
-                        <i class="fa-solid fa-magnifying-glass text-sm mb-1"></i><span class="text-[9px] font-medium whitespace-nowrap">深掘調査</span>
-                    </button>
+            <!-- タイトル入力セクション -->
+            <div class="shrink-0 px-4 md:px-8 pt-4 pb-2 border-b border-slate-100 flex items-center gap-2">
+                <input type="text" id="doc-title-input" class="w-full text-xl md:text-2xl font-bold text-slate-800 placeholder-slate-300 border-none focus:outline-none focus:ring-0 bg-transparent" placeholder="無題のドキュメント">
+            </div>
+
+            <!-- Markdown入力支援ツールバー -->
+            <div class="shrink-0 px-4 md:px-8 py-2 bg-slate-50/50 border-b border-slate-200 flex items-center gap-1 overflow-x-auto custom-scrollbar">
+                <button class="toolbar-btn text-slate-500 hover:text-primary hover:bg-slate-200 p-1.5 md:p-2 rounded transition flex-shrink-0" data-md="h2" title="章タイトル (H2)"><i class="fa-solid fa-heading"></i></button>
+                <button class="toolbar-btn text-slate-500 hover:text-primary hover:bg-slate-200 p-1.5 md:p-2 rounded transition flex-shrink-0" data-md="bold" title="太字"><i class="fa-solid fa-bold"></i></button>
+                <button class="toolbar-btn text-slate-500 hover:text-primary hover:bg-slate-200 p-1.5 md:p-2 rounded transition flex-shrink-0" data-md="italic" title="斜体"><i class="fa-solid fa-italic"></i></button>
+                <div class="w-px h-5 bg-slate-300 mx-1 flex-shrink-0"></div>
+                <button class="toolbar-btn text-slate-500 hover:text-primary hover:bg-slate-200 p-1.5 md:p-2 rounded transition flex-shrink-0" data-md="list-ul" title="箇条書き"><i class="fa-solid fa-list-ul"></i></button>
+                <button class="toolbar-btn text-slate-500 hover:text-primary hover:bg-slate-200 p-1.5 md:p-2 rounded transition flex-shrink-0" data-md="list-ol" title="番号付きリスト"><i class="fa-solid fa-list-ol"></i></button>
+                <div class="w-px h-5 bg-slate-300 mx-1 flex-shrink-0"></div>
+                <button class="toolbar-btn text-slate-500 hover:text-primary hover:bg-slate-200 p-1.5 md:p-2 rounded transition flex-shrink-0" data-md="quote" title="引用"><i class="fa-solid fa-quote-right"></i></button>
+                <button class="toolbar-btn text-slate-500 hover:text-primary hover:bg-slate-200 p-1.5 md:p-2 rounded transition flex-shrink-0" data-md="code" title="コード"><i class="fa-solid fa-code"></i></button>
+                <button class="toolbar-btn text-slate-500 hover:text-primary hover:bg-slate-200 p-1.5 md:p-2 rounded transition flex-shrink-0" data-md="link" title="リンク"><i class="fa-solid fa-link"></i></button>
+                
+                <div class="flex-1 min-w-[10px]"></div>
+                
+                <button id="btn-toggle-preview" class="text-slate-500 hover:text-primary hover:bg-primary/10 px-3 py-1.5 rounded transition text-sm font-medium flex items-center gap-1 whitespace-nowrap flex-shrink-0">
+                    <i class="fa-solid fa-eye"></i> プレビュー
+                </button>
+            </div>
+
+            <!-- エディタ & プレビュー コンテナ -->
+            <div class="flex-1 relative overflow-hidden bg-white">
+                <!-- 編集モード -->
+                <textarea id="editor" class="absolute inset-0 w-full h-full p-4 md:p-8 bg-transparent custom-scrollbar resize-none focus:outline-none" placeholder="ここから文章を書き始めましょう... (Markdown対応)&#10;テキストを選択するとAIメニューが表示されます。"></textarea>
+                
+                <!-- プレビューモード (WYSIWYGライク) -->
+                <div id="editor-preview" class="hidden absolute inset-0 p-4 md:p-8 overflow-y-auto custom-scrollbar prose prose-sm md:prose-base prose-slate max-w-none bg-white z-10 pb-20"></div>
+
+                <!-- AIアクションシート (モダンなフローティングメニュー) -->
+                <div id="ai-action-sheet" class="absolute bg-white border border-slate-200 shadow-xl z-20 rounded-lg p-2 transition-opacity duration-200 opacity-0 pointer-events-none hidden" style="width: max-content;">
+                    <div class="flex items-center justify-between mb-1 px-1 border-b border-slate-100 pb-1">
+                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">AIメニュー</span>
+                        <button id="btn-close-actions" class="text-slate-300 hover:text-slate-500 p-1"><i class="fa-solid fa-times text-xs"></i></button>
+                    </div>
+                    <div class="flex gap-1">
+                        <button class="ai-action-btn flex flex-col items-center p-2 rounded hover:bg-blue-50 text-primary transition min-w-[50px]" data-action="clean">
+                            <i class="fa-solid fa-broom text-sm mb-1"></i><span class="text-[9px] font-medium whitespace-nowrap">きれい化</span>
+                        </button>
+                        <button class="ai-action-btn flex flex-col items-center p-2 rounded hover:bg-blue-50 text-primary transition min-w-[50px]" data-action="summarize">
+                            <i class="fa-solid fa-compress text-sm mb-1"></i><span class="text-[9px] font-medium whitespace-nowrap">要約</span>
+                        </button>
+                        <button class="ai-action-btn flex flex-col items-center p-2 rounded hover:bg-blue-50 text-primary transition min-w-[50px]" data-action="refine">
+                            <i class="fa-solid fa-wand-magic-sparkles text-sm mb-1"></i><span class="text-[9px] font-medium whitespace-nowrap">表現修整</span>
+                        </button>
+                        <button class="ai-action-btn flex flex-col items-center p-2 rounded hover:bg-blue-50 text-primary transition min-w-[50px]" data-action="structure">
+                            <i class="fa-solid fa-list-ul text-sm mb-1"></i><span class="text-[9px] font-medium whitespace-nowrap">構造化</span>
+                        </button>
+                        <div class="w-px bg-slate-200 mx-1"></div>
+                        <button class="ai-action-btn flex flex-col items-center p-2 rounded hover:bg-blue-50 text-primary transition min-w-[50px]" data-action="research">
+                            <i class="fa-solid fa-magnifying-glass text-sm mb-1"></i><span class="text-[9px] font-medium whitespace-nowrap">深掘調査</span>
+                        </button>
+                    </div>
                 </div>
             </div>
         </main>
@@ -204,7 +242,7 @@
             </div>
 
             <!-- タブコンテンツ -->
-            <div class="flex-1 overflow-y-auto p-4 flex flex-col">
+            <div class="flex-1 overflow-y-auto p-4 flex flex-col custom-scrollbar">
                 
                 <!-- AIチャットタブ -->
                 <div id="tab-chat" class="tab-content active h-full flex flex-col">
@@ -256,7 +294,7 @@
             </div>
             
             <!-- モバイル用 サイドパネル閉じるボタン -->
-            <button id="btn-close-sidebar-mobile" class="md:hidden p-4 bg-slate-200 text-center font-bold text-slate-600 shrink-0">
+            <button id="btn-close-sidebar-mobile" class="md:hidden p-4 bg-slate-200 text-center font-bold text-slate-600 shrink-0 border-t border-slate-300">
                 閉じる
             </button>
         </aside>
@@ -271,13 +309,31 @@
             </div>
             <div class="p-4 flex-1">
                 <p class="text-sm text-slate-600 mb-2">選択したテキストを元に調査を行います。調査の方針や追加の指示を入力してください。</p>
-                <textarea id="research-prompt" class="w-full h-32 p-3 border border-slate-300 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-primary/50 text-sm" placeholder="例：最新の統計データを含めて解説して。反対意見の観点からも考察して。"></textarea>
+                <textarea id="research-prompt" class="w-full h-32 p-3 border border-slate-300 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-primary/50 text-sm custom-scrollbar" placeholder="例：最新の統計データを含めて解説して。反対意見の観点からも考察して。"></textarea>
             </div>
             <div class="p-4 border-t border-slate-100 flex justify-end gap-2 bg-slate-50">
                 <button id="btn-cancel-research" class="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-200 rounded-lg transition">キャンセル</button>
                 <button id="btn-execute-research" class="px-4 py-2 text-sm font-medium bg-primary text-white hover:bg-blue-600 rounded-lg transition shadow-md flex items-center gap-2">
                     <i class="fa-solid fa-paper-plane"></i> 調査開始
                 </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 設定モーダル -->
+    <div id="settings-modal" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col">
+            <div class="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                <h3 class="font-bold text-slate-700"><i class="fa-solid fa-gear text-primary mr-2"></i>設定</h3>
+                <button id="btn-close-settings" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-times text-lg"></i></button>
+            </div>
+            <div class="p-4 flex-1">
+                <label class="block text-sm font-medium text-slate-700 mb-1">Gemini APIキー</label>
+                <input type="password" id="input-api-key" class="w-full p-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 text-sm" placeholder="AIzaSy...">
+                <p class="text-xs text-slate-500 mt-2">APIキーはブラウザのローカルストレージにのみ保存され、直接Gemini APIへのリクエストに利用されます。</p>
+            </div>
+            <div class="p-4 border-t border-slate-100 flex justify-end gap-2 bg-slate-50">
+                <button id="btn-save-settings" class="px-4 py-2 text-sm font-medium bg-primary text-white hover:bg-blue-600 rounded-lg transition shadow-md">保存</button>
             </div>
         </div>
     </div>
@@ -289,11 +345,13 @@
         // ==========================================
         // 定数・初期設定
         // ==========================================
-        const WORKER_URL = 'https://green-credit-a6fb.ikymbiz.workers.dev';
         const SAVE_INTERVAL = 5 * 60 * 1000;
         
         // DOM Elements
+        const docTitleInput = document.getElementById('doc-title-input');
         const editor = document.getElementById('editor');
+        const editorPreview = document.getElementById('editor-preview');
+        const btnTogglePreview = document.getElementById('btn-toggle-preview');
         const aiActionSheet = document.getElementById('ai-action-sheet');
         const saveStatus = document.getElementById('save-status');
         const btnManualSave = document.getElementById('btn-manual-save');
@@ -324,7 +382,7 @@
             await loadDocumentList();
             
             setInterval(() => {
-                if(currentContent.trim() !== "") saveVersion('auto', '定期自動保存');
+                if(currentContent.trim() !== "" || docTitleInput.value.trim() !== "") saveVersion('auto', '定期自動保存');
             }, SAVE_INTERVAL);
         }
 
@@ -332,6 +390,15 @@
         // イベントリスナーの設定
         // ==========================================
         function setupEventListeners() {
+            // タイトル入力の監視
+            docTitleInput.addEventListener('input', () => {
+                updateSaveStatus("未保存", "text-amber-500", "fa-pen");
+                clearTimeout(typingTimer);
+                typingTimer = setTimeout(async () => {
+                    await saveDocument();
+                }, 1000);
+            });
+
             // エディタの入力監視
             editor.addEventListener('input', () => {
                 currentContent = editor.value;
@@ -344,10 +411,22 @@
                 }, 1000);
             });
 
+            // Markdown入力支援ツールバー
+            document.querySelectorAll('.toolbar-btn').forEach(btn => {
+                btn.addEventListener('mousedown', e => e.preventDefault()); // フォーカスを奪わない
+                btn.addEventListener('click', (e) => {
+                    const type = e.currentTarget.dataset.md;
+                    applyMarkdownFormat(type);
+                });
+            });
+
+            // プレビュー切り替え
+            btnTogglePreview.addEventListener('click', togglePreviewMode);
+
             // テキスト選択の監視
             document.addEventListener('selectionchange', handleSelection);
             
-            // アクションシートのボタン（マウスダウンでフォーカスが外れるのを防ぐ）
+            // アクションシートのボタン
             document.getElementById('btn-close-actions').addEventListener('mousedown', e => e.preventDefault());
             document.getElementById('btn-close-actions').addEventListener('click', hideActionSheet);
             
@@ -359,7 +438,7 @@
                 });
             });
 
-            // 左サイドバー（ドキュメント一覧）トグル
+            // 左サイドバー
             const toggleLeftSidebar = () => {
                 const sidebar = document.getElementById('left-sidebar');
                 const overlay = document.getElementById('left-sidebar-overlay');
@@ -415,6 +494,21 @@
                 saveVersion('manual', '手動保存');
             });
 
+            // 設定モーダル
+            document.getElementById('btn-settings').addEventListener('click', () => {
+                document.getElementById('input-api-key').value = localStorage.getItem('geminiApiKey') || '';
+                document.getElementById('settings-modal').classList.remove('hidden');
+            });
+            document.getElementById('btn-close-settings').addEventListener('click', () => {
+                document.getElementById('settings-modal').classList.add('hidden');
+            });
+            document.getElementById('btn-save-settings').addEventListener('click', () => {
+                const key = document.getElementById('input-api-key').value.trim();
+                localStorage.setItem('geminiApiKey', key);
+                document.getElementById('settings-modal').classList.add('hidden');
+                showToast('APIキーを保存しました', 'success');
+            });
+
             // 調査モーダル
             document.getElementById('btn-close-modal').addEventListener('click', hideResearchModal);
             document.getElementById('btn-cancel-research').addEventListener('click', hideResearchModal);
@@ -454,8 +548,96 @@
         }
 
         // ==========================================
-        // エディタ・テキスト選択ロジック
+        // エディタ・Markdown連携ロジック
         // ==========================================
+        function togglePreviewMode() {
+            const isPreview = !editorPreview.classList.contains('hidden');
+            if (isPreview) {
+                // 編集モードに戻る
+                editorPreview.classList.add('hidden');
+                editor.classList.remove('hidden');
+                btnTogglePreview.innerHTML = '<i class="fa-solid fa-eye"></i> プレビュー';
+                btnTogglePreview.classList.remove('bg-primary/10', 'text-primary');
+                editor.focus();
+            } else {
+                // プレビューモードにする (WYSIWYGライク)
+                editor.classList.add('hidden');
+                editorPreview.classList.remove('hidden');
+                btnTogglePreview.innerHTML = '<i class="fa-solid fa-pen"></i> 編集に戻る';
+                btnTogglePreview.classList.add('bg-primary/10', 'text-primary');
+                
+                // タイトルも含めてプレビューする
+                const titleMarkdown = docTitleInput.value.trim() ? `# ${docTitleInput.value.trim()}\n\n` : '';
+                editorPreview.innerHTML = marked.parse(titleMarkdown + (editor.value || '*何も書かれていません*'));
+                hideActionSheet(); // プレビュー中はAIメニューを隠す
+            }
+        }
+
+        function applyMarkdownFormat(type) {
+            if (editorPreview.classList.contains('hidden') === false) {
+                togglePreviewMode(); // プレビュー中なら編集モードに戻す
+            }
+
+            const start = editor.selectionStart;
+            const end = editor.selectionEnd;
+            const text = editor.value;
+            const selectedText = text.substring(start, end);
+            let newText = '';
+            let cursorOffset = 0;
+
+            switch(type) {
+                case 'h2':
+                    newText = `## ${selectedText || '章タイトル'}`;
+                    cursorOffset = selectedText ? newText.length : 3;
+                    break;
+                case 'bold':
+                    newText = `**${selectedText || '太字'}**`;
+                    cursorOffset = selectedText ? newText.length : 2;
+                    break;
+                case 'italic':
+                    newText = `*${selectedText || '斜体'}*`;
+                    cursorOffset = selectedText ? newText.length : 1;
+                    break;
+                case 'list-ul':
+                    newText = selectedText ? selectedText.split('\n').map(line => `- ${line}`).join('\n') : '- ';
+                    cursorOffset = newText.length;
+                    break;
+                case 'list-ol':
+                    newText = selectedText ? selectedText.split('\n').map((line, i) => `${i+1}. ${line}`).join('\n') : '1. ';
+                    cursorOffset = newText.length;
+                    break;
+                case 'quote':
+                    newText = selectedText ? selectedText.split('\n').map(line => `> ${line}`).join('\n') : '> ';
+                    cursorOffset = newText.length;
+                    break;
+                case 'code':
+                    if(selectedText.includes('\n') || !selectedText) {
+                        newText = `\`\`\`\n${selectedText || 'コードをここに記述'}\n\`\`\``;
+                        cursorOffset = selectedText ? newText.length : 4;
+                    } else {
+                        newText = `\`${selectedText}\``;
+                        cursorOffset = selectedText ? newText.length : 1;
+                    }
+                    break;
+                case 'link':
+                    newText = `[${selectedText || 'リンクテキスト'}](URL)`;
+                    cursorOffset = selectedText ? newText.length - 1 : 1;
+                    break;
+            }
+
+            const before = text.substring(0, start);
+            const after = text.substring(end);
+            editor.value = before + newText + after;
+            editor.dispatchEvent(new Event('input'));
+            editor.focus();
+            
+            if (selectedText) {
+                editor.setSelectionRange(start, start + newText.length);
+            } else {
+                editor.setSelectionRange(start + cursorOffset, start + cursorOffset);
+            }
+        }
+
         function getCaretCoordinates(element, position) {
             const div = document.createElement('div');
             const style = div.style;
@@ -481,7 +663,8 @@
             const span = document.createElement('span');
             span.textContent = element.value.substring(position) || '.';
             div.appendChild(span);
-            document.body.appendChild(div);
+            // editorの親コンテナにアペンドして座標を正確にする
+            element.parentNode.appendChild(div);
 
             const coordinates = {
                 top: span.offsetTop + parseInt(computed['borderTopWidth']),
@@ -489,11 +672,14 @@
                 height: parseInt(computed['lineHeight'])
             };
 
-            document.body.removeChild(div);
+            element.parentNode.removeChild(div);
             return coordinates;
         }
 
         function handleSelection() {
+            // プレビューモード中はメニューを出さない
+            if (!editorPreview.classList.contains('hidden')) return;
+
             if (document.activeElement === editor) {
                 const start = editor.selectionStart;
                 const end = editor.selectionEnd;
@@ -514,17 +700,18 @@
             aiActionSheet.classList.remove('hidden');
             
             requestAnimationFrame(() => {
-                const rect = editor.getBoundingClientRect();
+                // 親コンテナ (relative) 内での絶対配置計算
                 const coords = getCaretCoordinates(editor, selectionRange.end);
                 
-                let top = rect.top + coords.top - editor.scrollTop + coords.height + 10;
-                let left = rect.left + coords.left - editor.scrollLeft;
+                let top = coords.top - editor.scrollTop + coords.height + 5;
+                let left = coords.left - editor.scrollLeft;
                 
                 const width = aiActionSheet.offsetWidth;
                 const height = aiActionSheet.offsetHeight;
+                const containerRect = editor.parentNode.getBoundingClientRect();
                 
-                if (left + width > window.innerWidth) left = window.innerWidth - width - 10;
-                if (top + height > window.innerHeight) top = rect.top + coords.top - editor.scrollTop - height - 10;
+                if (left + width > containerRect.width) left = containerRect.width - width - 10;
+                if (top + height > containerRect.height) top = coords.top - editor.scrollTop - height - 5;
                 
                 left = Math.max(10, left);
                 top = Math.max(10, top);
@@ -546,6 +733,9 @@
         }
 
         function insertTextAtCursor(text) {
+            if (!editorPreview.classList.contains('hidden')) {
+                togglePreviewMode(); // 編集モードに戻す
+            }
             const cursorPos = editor.selectionStart;
             const textBefore = editor.value.substring(0, cursorPos);
             const textAfter = editor.value.substring(cursorPos, editor.value.length);
@@ -556,18 +746,8 @@
         }
 
         // ==========================================
-        // 目次・ドキュメント解析ロジック
+        // 目次生成ロジック
         // ==========================================
-        function extractTitle(text) {
-            const lines = text.split('\n');
-            for (let line of lines) {
-                const trimmed = line.trim();
-                if (trimmed.startsWith('# ')) return trimmed.replace(/^#\s*/, '').substring(0, 30);
-                if (trimmed.length > 0) return trimmed.substring(0, 30);
-            }
-            return '無題のドキュメント';
-        }
-
         function updateTOC() {
             const text = editor.value;
             const lines = text.split('\n');
@@ -586,7 +766,7 @@
             });
 
             if (headings.length === 0) {
-                tocList.innerHTML = '<li class="text-slate-500 italic text-sm">見出し(#)を追加すると目次が生成されます</li>';
+                tocList.innerHTML = '<li class="text-slate-500 italic text-sm">本文に見出し(#)を追加すると目次が生成されます</li>';
                 return;
             }
 
@@ -600,6 +780,7 @@
                 
                 li.innerHTML = `<i class="fa-solid fa-chevron-right text-[10px] text-slate-300 mr-1"></i> ${h.text}`;
                 li.addEventListener('click', () => {
+                    if (!editorPreview.classList.contains('hidden')) togglePreviewMode(); // 編集モードへ
                     scrollToLine(h.lineIndex);
                 });
                 tocList.appendChild(li);
@@ -661,27 +842,34 @@
         }
 
         async function processAIRequest(prompt, actionName, mode) {
+            const apiKey = localStorage.getItem('geminiApiKey');
+            if (!apiKey) {
+                showToast('設定からGemini APIキーを登録してください', 'warning');
+                document.getElementById('btn-settings').click();
+                return;
+            }
+
             isProcessing = true;
             const toastId = showToast(`${actionName}のAI処理を実行中...`, 'info', true);
             await saveVersion('ai', `AI処理前 (${actionName})`);
 
             try {
-                const res = await fetch(WORKER_URL, {
+                const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+                const res = await fetch(endpoint, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ prompt: prompt })
+                    body: JSON.stringify({ 
+                        contents: [{ parts: [{ text: prompt }] }]
+                    })
                 });
 
-                if (!res.ok) throw new Error('API通信エラー');
-
-                let resultText = '';
-                const contentType = res.headers.get("content-type");
-                if (contentType && contentType.indexOf("application/json") !== -1) {
-                    const data = await res.json();
-                    resultText = data.response || data.reply || data.text || data.result || JSON.stringify(data);
-                } else {
-                    resultText = await res.text();
+                if (!res.ok) {
+                    const errData = await res.json().catch(() => ({}));
+                    throw new Error(errData.error?.message || 'API通信エラー');
                 }
+
+                const data = await res.json();
+                const resultText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
 
                 removeToast(toastId);
 
@@ -710,7 +898,7 @@
             } catch (error) {
                 console.error(error);
                 removeToast(toastId);
-                showToast(`エラーが発生しました`, 'error');
+                showToast(`エラー: ${error.message}`, 'error');
             } finally {
                 isProcessing = false;
             }
@@ -720,6 +908,13 @@
         // AIチャットロジック
         // ==========================================
         async function sendChatMessage() {
+            const apiKey = localStorage.getItem('geminiApiKey');
+            if (!apiKey) {
+                showToast('設定からGemini APIキーを登録してください', 'warning');
+                document.getElementById('btn-settings').click();
+                return;
+            }
+
             const inputEl = document.getElementById('chat-input');
             const text = inputEl.value.trim();
             if (!text || isProcessing) return;
@@ -732,7 +927,10 @@
             
             if (includeDoc || includeSel) {
                 promptText = "以下のコンテキストを踏まえて質問に答えてください。\n\n";
-                if (includeDoc) promptText += `【ドキュメント全体】\n${currentContent}\n\n`;
+                if (includeDoc) {
+                    const fullDocText = `${docTitleInput.value}\n\n${currentContent}`;
+                    promptText += `【ドキュメント全体】\n${fullDocText}\n\n`;
+                }
                 if (includeSel && selectionRange.text) promptText += `【選択中のテキスト】\n${selectionRange.text}\n\n`;
                 promptText += `【質問・指示】\n${text}`;
             }
@@ -745,29 +943,30 @@
             const toastId = showToast('AIが応答しています...', 'info', true);
             
             try {
-                const res = await fetch(WORKER_URL, {
+                const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+                const res = await fetch(endpoint, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ prompt: promptText })
+                    body: JSON.stringify({ 
+                        contents: [{ parts: [{ text: promptText }] }]
+                    })
                 });
                 
-                if (!res.ok) throw new Error('API通信エラー');
-                
-                let resultText = '';
-                const contentType = res.headers.get("content-type");
-                if (contentType && contentType.indexOf("application/json") !== -1) {
-                    const data = await res.json();
-                    resultText = data.response || data.reply || data.text || data.result || JSON.stringify(data);
-                } else {
-                    resultText = await res.text();
+                if (!res.ok) {
+                    const errData = await res.json().catch(() => ({}));
+                    throw new Error(errData.error?.message || 'API通信エラー');
                 }
+                
+                const data = await res.json();
+                const resultText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
 
                 const aiMsg = { id: Date.now().toString(), docId: currentDocId, timestamp: new Date().toISOString(), role: 'ai', content: resultText };
                 await dbChat.setItem(aiMsg.id, aiMsg);
                 await loadChatHistory();
                 
             } catch (error) {
-                showToast('チャット通信エラー', 'error');
+                console.error(error);
+                showToast(`チャット通信エラー: ${error.message}`, 'error');
             } finally {
                 isProcessing = false;
                 removeToast(toastId);
@@ -825,15 +1024,8 @@
         async function loadDocumentList() {
             let list = await dbDocList.getItem('list') || [];
             
-            const oldMain = await dbDoc.getItem('main');
-            if (oldMain && list.length === 0) {
-                const newId = 'doc_' + Date.now();
-                list.push({ id: newId, title: extractTitle(oldMain.content), updatedAt: Date.now() });
-                await dbDoc.setItem(newId, { id: newId, content: oldMain.content, lastModified: oldMain.lastModified });
-                await dbDocList.setItem('list', list);
-                await dbDoc.removeItem('main');
-                currentDocId = newId;
-            } else if (list.length === 0) {
+            // 互換性確保用ロジック等
+            if (list.length === 0) {
                 const initDoc = { id: 'doc_' + Date.now(), title: '無題のドキュメント', updatedAt: Date.now() };
                 list.push(initDoc);
                 await dbDocList.setItem('list', list);
@@ -858,10 +1050,16 @@
             currentDocId = newId;
             editor.value = '';
             currentContent = '';
+            docTitleInput.value = '';
             
             renderDocList(list);
             await saveDocument();
             await saveVersion('init', '初期作成');
+            
+            if (!editorPreview.classList.contains('hidden')) {
+                togglePreviewMode(); // 新規作成時は編集モードへ
+            }
+            
             updateTOC();
             await loadHistory();
             await loadResearchNotes();
@@ -935,6 +1133,14 @@
 
         async function loadDocument() {
             if (!currentDocId) return;
+            
+            // タイトル情報の読み込み
+            const list = await dbDocList.getItem('list') || [];
+            const docMeta = list.find(d => d.id === currentDocId);
+            if (docMeta) {
+                docTitleInput.value = docMeta.title === '無題のドキュメント' ? '' : docMeta.title;
+            }
+
             const doc = await dbDoc.getItem(currentDocId);
             if (doc) {
                 editor.value = doc.content || '';
@@ -946,6 +1152,13 @@
                 await saveDocument();
                 await saveVersion('init', '初期作成');
             }
+
+            // プレビュー表示中の場合は内容を更新
+            if (!editorPreview.classList.contains('hidden')) {
+                const titleMarkdown = docTitleInput.value.trim() ? `# ${docTitleInput.value.trim()}\n\n` : '';
+                editorPreview.innerHTML = marked.parse(titleMarkdown + (editor.value || '*何も書かれていません*'));
+            }
+
             updateTOC();
             await loadHistory();
             await loadResearchNotes();
@@ -955,18 +1168,23 @@
         async function saveDocument() {
             if (!currentDocId) return;
             const content = editor.value;
+            const titleVal = docTitleInput.value.trim();
+            const docTitle = titleVal || '無題のドキュメント';
+
             const doc = { id: currentDocId, content: content, lastModified: new Date().toISOString() };
             await dbDoc.setItem(currentDocId, doc);
             
             let list = await dbDocList.getItem('list') || [];
             const docMeta = list.find(d => d.id === currentDocId);
             if (docMeta) {
-                const newTitle = extractTitle(content);
-                if (docMeta.title !== newTitle) {
-                    docMeta.title = newTitle;
+                if (docMeta.title !== docTitle) {
+                    docMeta.title = docTitle;
                     docMeta.updatedAt = Date.now();
                     await dbDocList.setItem('list', list);
                     renderDocList(list);
+                } else {
+                    docMeta.updatedAt = Date.now();
+                    await dbDocList.setItem('list', list);
                 }
             }
             updateSaveStatus("保存済", "text-slate-400", "fa-cloud-check");
@@ -980,13 +1198,18 @@
         async function saveVersion(reason, description) {
             if (!currentDocId) return;
             const content = editor.value;
-            if(!content) return;
+            const titleVal = docTitleInput.value.trim();
+            // 本文もタイトルも空なら保存しない
+            if(!content && !titleVal) return;
+
+            // 履歴にタイトルも含めて保存する
+            const savedContent = titleVal ? `# ${titleVal}\n\n${content}` : content;
 
             const version = {
                 id: Date.now().toString(),
                 docId: currentDocId,
                 timestamp: new Date().toISOString(),
-                content: content,
+                content: savedContent,
                 reason: reason,
                 description: description
             };
@@ -1036,11 +1259,29 @@
                 el.querySelector('.btn-restore').addEventListener('click', async () => {
                     if(confirm('現在の状態を上書きして復元しますか？（現在の状態は自動保存されます）')) {
                         await saveVersion('auto', '復元前のバックアップ');
-                        editor.value = v.content;
-                        currentContent = v.content;
+                        
+                        // 復元ロジック (タイトル行が含まれていれば分離する)
+                        let text = v.content;
+                        if(text.startsWith('# ')) {
+                            const firstLineEnd = text.indexOf('\n');
+                            if(firstLineEnd !== -1) {
+                                docTitleInput.value = text.substring(2, firstLineEnd).trim();
+                                text = text.substring(firstLineEnd).trimStart();
+                            } else {
+                                docTitleInput.value = text.substring(2).trim();
+                                text = "";
+                            }
+                        }
+                        
+                        editor.value = text;
+                        currentContent = text;
                         await saveDocument();
                         updateTOC();
                         showToast('バージョンを復元しました', 'success');
+                        
+                        if (!editorPreview.classList.contains('hidden')) {
+                            togglePreviewMode(); // 編集モードへ戻す
+                        }
                         if(window.innerWidth <= 768) document.getElementById('btn-toggle-sidebar').click();
                     }
                 });
