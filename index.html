@@ -171,7 +171,18 @@
                 <button class="toolbar-btn text-slate-500 hover:text-primary hover:bg-slate-200 p-1.5 md:p-2 rounded transition flex-shrink-0" data-md="italic" title="斜体"><i class="fa-solid fa-italic"></i></button>
                 <div class="w-px h-5 bg-slate-300 mx-1 flex-shrink-0"></div>
                 <button class="toolbar-btn text-slate-500 hover:text-primary hover:bg-slate-200 p-1.5 md:p-2 rounded transition flex-shrink-0" data-md="list-ul" title="箇条書き"><i class="fa-solid fa-list-ul"></i></button>
-                <button class="toolbar-btn text-slate-500 hover:text-primary hover:bg-slate-200 p-1.5 md:p-2 rounded transition flex-shrink-0" data-md="list-ol" title="番号付きリスト"><i class="fa-solid fa-list-ol"></i></button>
+                
+                <div class="flex items-center flex-shrink-0">
+                    <button class="toolbar-btn text-slate-500 hover:text-primary hover:bg-slate-200 p-1.5 md:p-2 rounded-l transition" data-md="list-ol" title="番号付きリスト"><i class="fa-solid fa-list-ol"></i></button>
+                    <select id="ol-type-select" class="bg-slate-100 text-slate-500 text-xs focus:outline-none p-1.5 border-l border-slate-200 rounded-r cursor-pointer hover:bg-slate-200 transition" title="項番の種類">
+                        <option value="1">1.</option>
+                        <option value="A">A.</option>
+                        <option value="a">a.</option>
+                        <option value="I">I.</option>
+                        <option value="i">i.</option>
+                    </select>
+                </div>
+
                 <div class="w-px h-5 bg-slate-300 mx-1 flex-shrink-0"></div>
                 <button class="toolbar-btn text-slate-500 hover:text-primary hover:bg-slate-200 p-1.5 md:p-2 rounded transition flex-shrink-0" data-md="quote" title="引用"><i class="fa-solid fa-quote-right"></i></button>
                 <button class="toolbar-btn text-slate-500 hover:text-primary hover:bg-slate-200 p-1.5 md:p-2 rounded transition flex-shrink-0" data-md="code" title="コード"><i class="fa-solid fa-code"></i></button>
@@ -179,7 +190,7 @@
                 
                 <div class="flex-1 min-w-[10px]"></div>
                 
-                <button id="btn-toggle-preview" class="text-slate-500 hover:text-primary hover:bg-primary/10 px-3 py-1.5 rounded transition text-sm font-medium flex items-center gap-1 whitespace-nowrap flex-shrink-0">
+                <button id="btn-toggle-preview" class="text-slate-500 hover:text-primary hover:bg-primary/10 px-3 py-1.5 rounded transition text-sm font-medium flex items-center gap-1 whitespace-nowrap flex-shrink-0 shadow-sm border border-slate-200 bg-white">
                     <i class="fa-solid fa-eye"></i> プレビュー
                 </button>
             </div>
@@ -343,10 +354,39 @@
 
     <script>
         // ==========================================
-        // 定数・初期設定
+        // 定数・初期設定・ヘルパー
         // ==========================================
         const SAVE_INTERVAL = 5 * 60 * 1000;
         
+        // ローマ数字変換ヘルパー
+        function intToRoman(num) {
+            if (isNaN(num)) return '';
+            const map = { M: 1000, CM: 900, D: 500, CD: 400, C: 100, XC: 90, L: 50, XL: 40, X: 10, IX: 9, V: 5, IV: 4, I: 1 };
+            let result = '';
+            for (let key in map) {
+                while (num >= map[key]) {
+                    result += key;
+                    num -= map[key];
+                }
+            }
+            return result;
+        }
+
+        function romanToInt(s) {
+            const map = { I: 1, V: 5, X: 10, L: 50, C: 100, D: 500, M: 1000 };
+            let total = 0;
+            for (let i = 0; i < s.length; i++) {
+                let current = map[s[i]];
+                let next = map[s[i + 1]];
+                if (next && current < next) {
+                    total -= current;
+                } else {
+                    total += current;
+                }
+            }
+            return total;
+        }
+
         // DOM Elements
         const docTitleInput = document.getElementById('doc-title-input');
         const editor = document.getElementById('editor');
@@ -359,6 +399,7 @@
         const historyList = document.getElementById('history-list');
         const researchList = document.getElementById('research-list');
         const docListEl = document.getElementById('doc-list');
+        const olTypeSelect = document.getElementById('ol-type-select');
         
         // State
         let currentDocId = null;
@@ -409,6 +450,74 @@
                     await saveDocument();
                     updateTOC();
                 }, 1000);
+            });
+
+            // エディタのEnterキーによる自動連番 (項番の増分)
+            editor.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    const cursor = editor.selectionStart;
+                    const textBeforeCursor = editor.value.substring(0, cursor);
+                    const textAfterCursor = editor.value.substring(cursor);
+                    
+                    const lines = textBeforeCursor.split('\n');
+                    const currentLine = lines[lines.length - 1];
+                    
+                    const matchUl = currentLine.match(/^(\s*)([-*+])\s+(.*)$/);
+                    const matchOl = currentLine.match(/^(\s*)([0-9]+|[A-Z]|[a-z]|[IVXLCDM]+|[ivxlcdm]+)\.\s+(.*)$/);
+
+                    if (matchUl || matchOl) {
+                        e.preventDefault();
+                        
+                        if ((matchUl && !matchUl[3]) || (matchOl && !matchOl[3])) {
+                            // 空のリスト項目でEnterを押した場合はリスト終了
+                            const newTextBefore = textBeforeCursor.substring(0, textBeforeCursor.length - currentLine.length);
+                            editor.value = newTextBefore + '\n' + textAfterCursor;
+                            editor.selectionStart = editor.selectionEnd = newTextBefore.length + 1;
+                            editor.dispatchEvent(new Event('input'));
+                            return;
+                        }
+
+                        let nextPrefix = '\n';
+                        
+                        if (matchUl) {
+                            nextPrefix += `${matchUl[1]}${matchUl[2]} `;
+                        } else if (matchOl) {
+                            const spaces = matchOl[1];
+                            const numStr = matchOl[2];
+                            let nextNumStr = '';
+                            
+                            const currentOlType = olTypeSelect.value;
+                            
+                            if (/^[0-9]+$/.test(numStr)) {
+                                nextNumStr = (parseInt(numStr, 10) + 1).toString();
+                            } else if (currentOlType === 'I' && /^[IVXLCDM]+$/.test(numStr)) {
+                                nextNumStr = intToRoman(romanToInt(numStr) + 1);
+                            } else if (currentOlType === 'i' && /^[ivxlcdm]+$/.test(numStr)) {
+                                nextNumStr = intToRoman(romanToInt(numStr.toUpperCase()) + 1).toLowerCase();
+                            } else if (/^[A-Z]$/.test(numStr)) {
+                                nextNumStr = String.fromCharCode(numStr.charCodeAt(0) + 1);
+                            } else if (/^[a-z]$/.test(numStr)) {
+                                nextNumStr = String.fromCharCode(numStr.charCodeAt(0) + 1);
+                            } else if (/^[IVXLCDM]+$/.test(numStr)) {
+                                nextNumStr = intToRoman(romanToInt(numStr) + 1);
+                            } else if (/^[ivxlcdm]+$/.test(numStr)) {
+                                nextNumStr = intToRoman(romanToInt(numStr.toUpperCase()) + 1).toLowerCase();
+                            } else {
+                                nextNumStr = '1';
+                            }
+                            
+                            nextPrefix += `${spaces}${nextNumStr}. `;
+                        }
+
+                        editor.value = textBeforeCursor + nextPrefix + textAfterCursor;
+                        editor.selectionStart = editor.selectionEnd = cursor + nextPrefix.length;
+                        editor.dispatchEvent(new Event('input'));
+                        
+                        // 自動スクロール
+                        const lineHeight = parseInt(window.getComputedStyle(editor).lineHeight);
+                        editor.scrollTop = (lines.length) * lineHeight;
+                    }
+                }
             });
 
             // Markdown入力支援ツールバー
@@ -603,7 +712,27 @@
                     cursorOffset = newText.length;
                     break;
                 case 'list-ol':
-                    newText = selectedText ? selectedText.split('\n').map((line, i) => `${i+1}. ${line}`).join('\n') : '1. ';
+                    const olType = olTypeSelect.value;
+                    let listPrefix = '1. ';
+                    if (olType === 'A') listPrefix = 'A. ';
+                    else if (olType === 'a') listPrefix = 'a. ';
+                    else if (olType === 'I') listPrefix = 'I. ';
+                    else if (olType === 'i') listPrefix = 'i. ';
+
+                    if (selectedText) {
+                        const lines = selectedText.split('\n');
+                        newText = lines.map((line, i) => {
+                            let prefix = listPrefix;
+                            if (olType === '1') prefix = `${i+1}. `;
+                            else if (olType === 'A') prefix = `${String.fromCharCode(65 + i)}. `;
+                            else if (olType === 'a') prefix = `${String.fromCharCode(97 + i)}. `;
+                            else if (olType === 'I') prefix = `${intToRoman(i+1)}. `;
+                            else if (olType === 'i') prefix = `${intToRoman(i+1).toLowerCase()}. `;
+                            return `${prefix}${line}`;
+                        }).join('\n');
+                    } else {
+                        newText = listPrefix;
+                    }
                     cursorOffset = newText.length;
                     break;
                 case 'quote':
@@ -663,7 +792,6 @@
             const span = document.createElement('span');
             span.textContent = element.value.substring(position) || '.';
             div.appendChild(span);
-            // editorの親コンテナにアペンドして座標を正確にする
             element.parentNode.appendChild(div);
 
             const coordinates = {
@@ -677,7 +805,6 @@
         }
 
         function handleSelection() {
-            // プレビューモード中はメニューを出さない
             if (!editorPreview.classList.contains('hidden')) return;
 
             if (document.activeElement === editor) {
@@ -700,7 +827,6 @@
             aiActionSheet.classList.remove('hidden');
             
             requestAnimationFrame(() => {
-                // 親コンテナ (relative) 内での絶対配置計算
                 const coords = getCaretCoordinates(editor, selectionRange.end);
                 
                 let top = coords.top - editor.scrollTop + coords.height + 5;
@@ -734,7 +860,7 @@
 
         function insertTextAtCursor(text) {
             if (!editorPreview.classList.contains('hidden')) {
-                togglePreviewMode(); // 編集モードに戻す
+                togglePreviewMode(); 
             }
             const cursorPos = editor.selectionStart;
             const textBefore = editor.value.substring(0, cursorPos);
@@ -780,7 +906,7 @@
                 
                 li.innerHTML = `<i class="fa-solid fa-chevron-right text-[10px] text-slate-300 mr-1"></i> ${h.text}`;
                 li.addEventListener('click', () => {
-                    if (!editorPreview.classList.contains('hidden')) togglePreviewMode(); // 編集モードへ
+                    if (!editorPreview.classList.contains('hidden')) togglePreviewMode(); 
                     scrollToLine(h.lineIndex);
                 });
                 tocList.appendChild(li);
@@ -1024,7 +1150,6 @@
         async function loadDocumentList() {
             let list = await dbDocList.getItem('list') || [];
             
-            // 互換性確保用ロジック等
             if (list.length === 0) {
                 const initDoc = { id: 'doc_' + Date.now(), title: '無題のドキュメント', updatedAt: Date.now() };
                 list.push(initDoc);
@@ -1057,7 +1182,7 @@
             await saveVersion('init', '初期作成');
             
             if (!editorPreview.classList.contains('hidden')) {
-                togglePreviewMode(); // 新規作成時は編集モードへ
+                togglePreviewMode(); 
             }
             
             updateTOC();
@@ -1101,11 +1226,12 @@
                 const isActive = doc.id === currentDocId;
                 div.className = `p-2 rounded cursor-pointer text-sm flex justify-between items-center group transition ${isActive ? 'bg-primary/10 text-primary font-bold' : 'text-slate-600 hover:bg-slate-100'}`;
                 
+                // モバイルでも削除ボタンにアクセスしやすいように、opacity クラスを調整
                 div.innerHTML = `
                     <div class="truncate flex-1 btn-switch-doc pr-2">
                         <i class="fa-regular fa-file-lines mr-2 ${isActive ? 'text-primary' : 'text-slate-400'}"></i>${doc.title}
                     </div>
-                    <button class="btn-delete-doc text-slate-300 hover:text-red-500 px-2 opacity-0 group-hover:opacity-100 transition ${isActive ? '' : 'hidden'}" title="削除">
+                    <button class="btn-delete-doc text-slate-400 hover:text-red-500 px-2 md:opacity-0 md:group-hover:opacity-100 opacity-100 transition ${isActive ? '' : 'hidden'}" title="削除">
                         <i class="fa-solid fa-trash"></i>
                     </button>
                 `;
@@ -1134,7 +1260,6 @@
         async function loadDocument() {
             if (!currentDocId) return;
             
-            // タイトル情報の読み込み
             const list = await dbDocList.getItem('list') || [];
             const docMeta = list.find(d => d.id === currentDocId);
             if (docMeta) {
@@ -1153,7 +1278,6 @@
                 await saveVersion('init', '初期作成');
             }
 
-            // プレビュー表示中の場合は内容を更新
             if (!editorPreview.classList.contains('hidden')) {
                 const titleMarkdown = docTitleInput.value.trim() ? `# ${docTitleInput.value.trim()}\n\n` : '';
                 editorPreview.innerHTML = marked.parse(titleMarkdown + (editor.value || '*何も書かれていません*'));
@@ -1199,10 +1323,8 @@
             if (!currentDocId) return;
             const content = editor.value;
             const titleVal = docTitleInput.value.trim();
-            // 本文もタイトルも空なら保存しない
             if(!content && !titleVal) return;
 
-            // 履歴にタイトルも含めて保存する
             const savedContent = titleVal ? `# ${titleVal}\n\n${content}` : content;
 
             const version = {
@@ -1260,7 +1382,6 @@
                     if(confirm('現在の状態を上書きして復元しますか？（現在の状態は自動保存されます）')) {
                         await saveVersion('auto', '復元前のバックアップ');
                         
-                        // 復元ロジック (タイトル行が含まれていれば分離する)
                         let text = v.content;
                         if(text.startsWith('# ')) {
                             const firstLineEnd = text.indexOf('\n');
@@ -1280,7 +1401,7 @@
                         showToast('バージョンを復元しました', 'success');
                         
                         if (!editorPreview.classList.contains('hidden')) {
-                            togglePreviewMode(); // 編集モードへ戻す
+                            togglePreviewMode(); 
                         }
                         if(window.innerWidth <= 768) document.getElementById('btn-toggle-sidebar').click();
                     }
