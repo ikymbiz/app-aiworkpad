@@ -363,7 +363,7 @@
             <div class="p-4 flex-1">
                 <label class="block text-sm font-medium text-slate-700 mb-1">Gemini APIキー</label>
                 <input type="password" id="input-api-key" class="w-full p-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 text-sm" placeholder="AIzaSy...">
-                <p class="text-xs text-slate-500 mt-2">APIキーはブラウザのローカルストレージにのみ保存され、直接Gemini APIへのリクエストに利用されます。</p>
+                <p class="text-xs text-slate-500 mt-2">APIキーはブラウザのセキュアなローカルデータベース（IndexedDB）にのみ保存され、直接Gemini APIへのリクエストに利用されます。</p>
             </div>
             <div class="p-4 border-t border-slate-100 flex justify-end gap-2 bg-slate-50">
                 <button id="btn-save-settings" class="px-4 py-2 text-sm font-medium bg-primary text-white hover:bg-blue-600 rounded-lg transition shadow-md">保存</button>
@@ -447,11 +447,28 @@
         const dbHistory = localforage.createInstance({ name: "AIWorkPad", storeName: "history" });
         const dbResearch = localforage.createInstance({ name: "AIWorkPad", storeName: "research" });
         const dbChat = localforage.createInstance({ name: "AIWorkPad", storeName: "chat" });
+        const dbSettings = localforage.createInstance({ name: "AIWorkPad", storeName: "settings" });
 
         // ==========================================
         // 初期化処理
         // ==========================================
+        async function migrateSettings() {
+            try {
+                const oldKey = localStorage.getItem('geminiApiKey');
+                if (oldKey) {
+                    const existingKey = await dbSettings.getItem('geminiApiKey');
+                    if (!existingKey) {
+                        await dbSettings.setItem('geminiApiKey', oldKey);
+                    }
+                    localStorage.removeItem('geminiApiKey');
+                }
+            } catch(e) {
+                console.error("Migration error:", e);
+            }
+        }
+
         async function init() {
+            await migrateSettings();
             setupEventListeners();
             await loadDocumentList();
             
@@ -636,18 +653,35 @@
             });
 
             // 設定モーダル
-            document.getElementById('btn-settings').addEventListener('click', () => {
-                document.getElementById('input-api-key').value = localStorage.getItem('geminiApiKey') || '';
+            document.getElementById('btn-settings').addEventListener('click', async () => {
+                try {
+                    const apiKey = await dbSettings.getItem('geminiApiKey');
+                    document.getElementById('input-api-key').value = apiKey || '';
+                } catch(e) {
+                    console.error(e);
+                    document.getElementById('input-api-key').value = '';
+                }
                 document.getElementById('settings-modal').classList.remove('hidden');
             });
             document.getElementById('btn-close-settings').addEventListener('click', () => {
                 document.getElementById('settings-modal').classList.add('hidden');
             });
-            document.getElementById('btn-save-settings').addEventListener('click', () => {
+            document.getElementById('btn-save-settings').addEventListener('click', async () => {
                 const key = document.getElementById('input-api-key').value.trim();
-                localStorage.setItem('geminiApiKey', key);
-                document.getElementById('settings-modal').classList.add('hidden');
-                showToast('APIキーを保存しました', 'success');
+                
+                if (key && !key.startsWith('AIzaSy')) {
+                    showToast('無効なAPIキーの形式です (AIza...で開始)', 'warning');
+                    return;
+                }
+
+                try {
+                    await dbSettings.setItem('geminiApiKey', key);
+                    document.getElementById('settings-modal').classList.add('hidden');
+                    showToast('APIキーを保存しました', 'success');
+                } catch(e) {
+                    console.error(e);
+                    showToast('APIキーの保存に失敗しました', 'error');
+                }
             });
 
             // 調査モーダル
@@ -997,7 +1031,13 @@
         }
 
         async function processAIRequest(prompt, actionName, mode) {
-            const apiKey = localStorage.getItem('geminiApiKey');
+            let apiKey;
+            try {
+                apiKey = await dbSettings.getItem('geminiApiKey');
+            } catch(e) {
+                console.error(e);
+            }
+
             if (!apiKey) {
                 showToast('設定からGemini APIキーを登録してください', 'warning');
                 document.getElementById('btn-settings').click();
@@ -1063,7 +1103,13 @@
         // AIチャットロジック
         // ==========================================
         async function sendChatMessage() {
-            const apiKey = localStorage.getItem('geminiApiKey');
+            let apiKey;
+            try {
+                apiKey = await dbSettings.getItem('geminiApiKey');
+            } catch(e) {
+                console.error(e);
+            }
+
             if (!apiKey) {
                 showToast('設定からGemini APIキーを登録してください', 'warning');
                 document.getElementById('btn-settings').click();
