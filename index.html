@@ -134,6 +134,13 @@
             scroll-behavior: smooth;
         }
         .ai-action-carousel::-webkit-scrollbar { height: 0; width: 0; display: none; }
+
+        /* ツリー表示のドラッグ&ドロップターゲット */
+        .drop-target {
+            background-color: #e2e8f0 !important;
+            outline: 1.5px dashed #3b82f6;
+            outline-offset: -1.5px;
+        }
     </style>
 </head>
 <body class="bg-light text-slate-800 flex flex-col font-sans">
@@ -172,13 +179,13 @@
 
         <!-- 左サイドバー (ドキュメント一覧) -->
         <aside id="left-sidebar" class="w-64 bg-slate-50 border-r border-slate-200 flex flex-col shrink-0 absolute md:relative h-full z-50">
-            <div class="p-3 border-b border-slate-200 flex justify-between items-center bg-white">
-                <span class="font-bold text-slate-700 text-sm"><i class="fa-solid fa-file-lines mr-1 text-primary"></i> ドキュメント</span>
-                <button id="btn-new-doc" class="text-slate-400 hover:text-primary transition p-1" title="新規ドキュメント作成">
-                    <i class="fa-solid fa-plus"></i>
+            <div id="doc-list-header" class="p-3 border-b border-slate-200 flex justify-between items-center bg-white transition-colors">
+                <span class="font-bold text-slate-700 text-sm"><i class="fa-solid fa-folder-tree mr-1 text-primary"></i> ドキュメント</span>
+                <button id="btn-new-doc" class="text-slate-400 hover:text-primary transition p-1" title="新規作成（ルート階層）">
+                    <i class="fa-solid fa-file-circle-plus"></i>
                 </button>
             </div>
-            <div id="doc-list" class="flex-1 overflow-y-auto p-2 space-y-1 custom-scrollbar"></div>
+            <div id="doc-list" class="flex-1 overflow-y-auto p-2 space-y-0.5 custom-scrollbar pb-10"></div>
             <button id="btn-close-left-sidebar" class="md:hidden p-3 bg-slate-200 text-center font-bold text-slate-600 text-sm border-t border-slate-300">
                 閉じる
             </button>
@@ -296,10 +303,10 @@
                     <div class="mt-2 pt-2 border-t border-slate-200 shrink-0">
                         <div class="flex flex-wrap gap-2 mb-2 text-[10px] text-slate-500 font-medium">
                             <label class="flex items-center gap-1 cursor-pointer"><input type="checkbox" id="chat-ctx-doc" class="rounded text-primary">ドキュメント全体を含める</label>
-                            <label class="flex items-center gap-1 cursor-pointer"><input type="checkbox" id="chat-ctx-sel" class="rounded text-primary">選択中テキストを含める</label>
+                            <label class="flex items-center gap-1 cursor-pointer"><input type="checkbox" id="chat-ctx-sel" class="rounded text-primary">選択中を含める</label>
                         </div>
                         <div class="flex gap-2 items-end">
-                            <textarea id="chat-input" class="flex-1 bg-white border border-slate-300 rounded-lg p-2 text-sm resize-none focus:outline-none focus:ring-1 focus:ring-primary shadow-inner custom-scrollbar" rows="2" placeholder="メッセージを入力... (Enterで改行)"></textarea>
+                            <textarea id="chat-input" class="flex-1 bg-white border border-slate-300 rounded-lg p-2 text-sm resize-none focus:outline-none focus:ring-1 focus:ring-primary shadow-inner custom-scrollbar" rows="2" placeholder="メッセージを入力..."></textarea>
                             <button id="btn-send-chat" class="h-10 w-10 shrink-0 bg-primary text-white rounded-lg hover:bg-blue-600 transition flex items-center justify-center shadow-md"><i class="fa-solid fa-paper-plane"></i></button>
                         </div>
                     </div>
@@ -338,11 +345,8 @@
 
                     <!-- フッター固定アクション (Draft用) -->
                     <div class="fixed md:absolute bottom-0 left-0 right-0 p-3 bg-white border-t border-slate-200 flex gap-2 z-10">
-                        <button id="btn-draft-insert" class="flex-1 py-2 text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition">
-                            末尾に挿入
-                        </button>
-                        <button id="btn-draft-new" class="flex-1 py-2 text-xs font-bold text-white bg-primary hover:bg-blue-600 rounded-lg transition shadow-md">
-                            新規保存
+                        <button id="btn-draft-insert" class="flex-1 py-2 text-xs font-bold text-white bg-primary hover:bg-blue-600 rounded-lg transition shadow-md flex justify-center items-center gap-2">
+                            <i class="fa-solid fa-file-import"></i> エディタに挿入
                         </button>
                     </div>
                 </div>
@@ -500,7 +504,6 @@
             try {
                 let resultText = '';
                 if (aiModel === 'claude') {
-                    // Anthropic API Call (Requires proper CORS handling or proxy in prod, using direct for standard spec)
                     const res = await fetch('https://api.anthropic.com/v1/messages', {
                         method: 'POST',
                         headers: {
@@ -523,7 +526,6 @@
                     const data = await res.json();
                     resultText = data.content?.[0]?.text || '';
                 } else {
-                    // Gemini API Call
                     const endpoint = \`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=\${apiKey}\`;
                     const body = { contents: [{ role: 'user', parts: [{ text: prompt }] }] };
                     if (systemPrompt) body.systemInstruction = { parts: [{ text: systemPrompt }] };
@@ -584,7 +586,6 @@
         }
 
         function showToast(message, type = 'info', isPersistent = false) {
-            // 設定によるフィルタ
             if (type === 'save' && !appSettings.notifySave) return;
             if (type === 'aiComplete' && !appSettings.notifyAI) return;
             if (type === 'error' && !appSettings.notifyError) return;
@@ -605,7 +606,6 @@
 
             toast.innerHTML = `${iconHtml}<span class="font-medium truncate">${message}</span>`;
             
-            // 下から積むため先頭に追加
             container.insertBefore(toast, container.firstChild);
 
             if (!isPersistent) setTimeout(() => removeToast(id), duration);
@@ -752,8 +752,27 @@
                 });
             });
 
-            document.getElementById('btn-new-doc').addEventListener('click', createNewDocument);
+            // 新規作成(ルート階層)
+            document.getElementById('btn-new-doc').addEventListener('click', () => createNewDocument(null));
             document.getElementById('btn-manual-save').addEventListener('click', () => { saveDocument(); saveVersion('manual', '手動保存'); });
+
+            // ドラッグ＆ドロップ（ルート階層への移動）
+            const docListHeader = document.getElementById('doc-list-header');
+            docListHeader.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                docListHeader.classList.add('bg-blue-50');
+            });
+            docListHeader.addEventListener('dragleave', (e) => {
+                docListHeader.classList.remove('bg-blue-50');
+            });
+            docListHeader.addEventListener('drop', async (e) => {
+                e.preventDefault();
+                docListHeader.classList.remove('bg-blue-50');
+                const draggedId = e.dataTransfer.getData('text/plain');
+                if (draggedId) {
+                    await moveDocument(draggedId, null);
+                }
+            });
 
             // 設定モーダル
             document.getElementById('btn-settings').addEventListener('click', () => {
@@ -799,15 +818,13 @@
 
             // チャット
             document.getElementById('btn-send-chat').addEventListener('click', sendChatMessage);
-            document.getElementById('chat-input').addEventListener('keydown', (e) => {
-                // Enterは改行のみ（ネイティブ動作に委ねるため特にpreventDefaultしない。送信はボタンのみ）
-            });
+            document.getElementById('chat-input').addEventListener('keydown', (e) => {});
             document.getElementById('btn-clear-chat').addEventListener('click', async () => {
                 if(confirm('チャット履歴をクリアしますか？')) {
                     const keys = await dbChat.keys();
                     for(let k of keys) {
                         const item = await dbChat.getItem(k);
-                        if(item.docId === currentDocId) await dbChat.removeItem(k);
+                        if(item && item.docId === currentDocId) await dbChat.removeItem(k);
                     }
                     await loadChatHistory();
                 }
@@ -816,14 +833,9 @@
             // Draft
             document.getElementById('btn-generate-draft').addEventListener('click', generateDraft);
             document.getElementById('btn-draft-insert').addEventListener('click', () => {
-                if(draftContentCache) { insertTextAtCursor(`\n\n${draftContentCache}\n`); showToast('末尾に挿入しました', 'success'); }
-            });
-            document.getElementById('btn-draft-new').addEventListener('click', async () => {
-                if(draftContentCache) {
-                    await createNewDocument();
-                    editor.value = draftContentCache; currentContent = draftContentCache;
-                    docTitleInput.value = "AIドラフト: " + new Date().toLocaleDateString();
-                    await saveDocument(); updateTOC(); showToast('新規ドキュメントとして保存しました', 'success');
+                if(draftContentCache) { 
+                    insertTextAtCursor(draftContentCache); 
+                    showToast('エディタに挿入しました', 'success'); 
                 }
             });
             document.getElementById('btn-clear-draft').addEventListener('click', () => {
@@ -897,14 +909,14 @@
 
         function insertTextAtCursor(text) {
             if (!editorPreview.classList.contains('hidden')) togglePreviewMode(); 
-            const pos = editor.selectionStart;
-            editor.value = editor.value.substring(0, pos) + text + editor.value.substring(pos);
+            const start = editor.selectionStart;
+            const end = editor.selectionEnd;
+            editor.value = editor.value.substring(0, start) + text + editor.value.substring(end);
             editor.dispatchEvent(new Event('input'));
-            editor.focus(); editor.setSelectionRange(pos + text.length, pos + text.length);
+            editor.focus(); editor.setSelectionRange(start + text.length, start + text.length);
         }
 
         function applyMarkdownFormat(type) {
-            // (省略せず保持)
             if (editorPreview.classList.contains('hidden') === false) togglePreviewMode();
             const start = editor.selectionStart; const end = editor.selectionEnd;
             const text = editor.value; const selectedText = text.substring(start, end);
@@ -975,11 +987,10 @@
             const systemPrompt = sysPrompt || getPersonaPrompt('default');
             const taskData = { aiModel, apiKey, prompt, systemPrompt, actionName, mode };
 
-            await dbSettings.setItem('pendingAI', taskData); // レジューム用
+            await dbSettings.setItem('pendingAI', taskData);
             setAIProcessingState(true);
             await requestWakeLock();
             
-            // 処理開始時は2秒で消えるinfo通知
             showToast(`${actionName}を実行中...`, 'info');
 
             try {
@@ -1041,13 +1052,11 @@
             document.getElementById('research-modal').classList.add('hidden');
             const prompt = `以下の文章と調査方針に基づいて、深掘り調査を行い、詳細なレポート（マークダウン形式）を作成してください。\n\n【対象文章】\n${selectionRange.text}\n\n【調査方針】\n${instruction || '深く掘り下げて解説して'}`;
             
-            // Researchは特殊な結果保存なので直接Worker呼出し
             const aiModel = appSettings.defaultModel;
             const apiKey = getAPIKey(aiModel); if(!apiKey) return;
             setAIProcessingState(true); await requestWakeLock(); showToast(`深掘り調査を実行中...`, 'info');
             try {
                 const data = await runAIWorker({ aiModel, apiKey, prompt, systemPrompt: getPersonaPrompt('default'), actionName: '深掘り調査', mode: 'research' });
-                // 今後ノート保存機能に戻す（今回はDraftタブがあるのでチャットかDraftに統合可能だが、要件通り既存の履歴ノート機能へ）
                 insertTextAtCursor(`\n\n> **深掘り調査結果**\n${data.resultText}\n\n`);
                 showToast(`調査結果を挿入しました`, 'aiComplete');
             } catch(e) { showToast(`エラー: ${e.message}`, 'error'); } 
@@ -1083,7 +1092,7 @@
 
         async function loadChatHistory() {
             const keys = await dbChat.keys();
-            const messages = (await Promise.all(keys.map(k => dbChat.getItem(k)))).filter(m => m.docId === currentDocId).sort((a,b)=> new Date(a.timestamp) - new Date(b.timestamp));
+            const messages = (await Promise.all(keys.map(k => dbChat.getItem(k)))).filter(m => m && m.docId === currentDocId).sort((a,b)=> new Date(a.timestamp) - new Date(b.timestamp));
             
             const list = document.getElementById('chat-list'); list.innerHTML = '';
             if (messages.length === 0) { list.innerHTML = '<p class="text-[10px] text-slate-400 italic text-center mt-4">履歴なし</p>'; return; }
@@ -1099,7 +1108,10 @@
                     </div>
                     ${!isU ? `<button class="text-[9px] text-primary mt-1 self-end btn-chat-ins"><i class="fa-solid fa-file-import"></i> 挿入</button>` : ''}
                 `;
-                if(!isU) div.querySelector('.btn-chat-ins').addEventListener('click', () => { insertTextAtCursor(`\n${msg.content}\n`); showToast('挿入しました', 'success'); });
+                if(!isU) div.querySelector('.btn-chat-ins').addEventListener('click', () => { 
+                    insertTextAtCursor(`\n${msg.content}\n`); 
+                    showToast('挿入しました', 'success'); 
+                });
                 list.appendChild(div);
             });
             list.scrollTop = list.scrollHeight;
@@ -1124,23 +1136,48 @@
         }
 
         // ==========================================
-        // ドキュメント管理
+        // ドキュメントツリー・ファイル管理
         // ==========================================
         async function loadDocumentList() {
             let list = await dbDocList.getItem('list') || [];
+            let modified = false;
+            list.forEach(d => {
+                if (d.parentId === undefined) { d.parentId = null; modified = true; }
+                if (d.isExpanded === undefined) { d.isExpanded = true; modified = true; }
+            });
+            if (modified) await dbDocList.setItem('list', list);
+
             if (list.length === 0) {
-                const initDoc = { id: 'doc_' + Date.now(), title: '無題', updatedAt: Date.now() };
+                const initDoc = { id: 'doc_' + Date.now(), title: '無題', updatedAt: Date.now(), parentId: null, isExpanded: true };
                 list.push(initDoc); await dbDocList.setItem('list', list); currentDocId = initDoc.id;
             } else if (!currentDocId || !list.find(d => d.id === currentDocId)) currentDocId = list[0].id;
+            
             renderDocList(list); await loadDocument();
         }
 
-        async function createNewDocument() {
+        async function createNewDocument(parentId = null) {
             await saveDocument();
             let list = await dbDocList.getItem('list') || [];
+
+            if (parentId) {
+                let depth = 1;
+                let curr = list.find(d => d.id === parentId);
+                while(curr && curr.parentId) {
+                    depth++;
+                    curr = list.find(d => d.id === curr.parentId);
+                }
+                if (depth >= 10) {
+                    showToast('最大10階層までしか作成できません', 'warning');
+                    return;
+                }
+                const parent = list.find(d => d.id === parentId);
+                if (parent) parent.isExpanded = true;
+            }
+
             const newId = 'doc_' + Date.now();
-            list.push({ id: newId, title: '無題', updatedAt: Date.now() });
+            list.push({ id: newId, title: '無題', updatedAt: Date.now(), parentId: parentId, isExpanded: true });
             await dbDocList.setItem('list', list);
+            
             currentDocId = newId; editor.value = ''; currentContent = ''; docTitleInput.value = '';
             renderDocList(list); await saveDocument(); await saveVersion('init', '作成');
             if (!editorPreview.classList.contains('hidden')) togglePreviewMode(); 
@@ -1148,18 +1185,226 @@
             if (window.innerWidth <= 768) document.getElementById('btn-close-left-sidebar').click();
         }
 
-        function renderDocList(list) {
-            docListEl.innerHTML = ''; list.sort((a, b) => b.updatedAt - a.updatedAt);
-            list.forEach(doc => {
-                const div = document.createElement('div');
-                const isAct = doc.id === currentDocId;
-                div.className = `p-2 rounded cursor-pointer text-xs sm:text-sm flex justify-between items-center transition ${isAct ? 'bg-primary/10 text-primary font-bold' : 'text-slate-600 hover:bg-slate-100'}`;
-                div.innerHTML = `<div class="truncate flex-1 btn-sw pr-2"><i class="fa-regular fa-file-lines mr-2 ${isAct?'text-primary':'text-slate-400'}"></i>${doc.title}</div>`;
-                div.querySelector('.btn-sw').addEventListener('click', async () => {
-                    if (currentDocId !== doc.id) { await saveDocument(); currentDocId = doc.id; renderDocList(await dbDocList.getItem('list')); await loadDocument(); if (window.innerWidth <= 768) document.getElementById('btn-close-left-sidebar').click(); }
+        async function deleteDocument(docId) {
+            let list = await dbDocList.getItem('list') || [];
+            
+            function getDescendants(parentId) {
+                let children = list.filter(d => d.parentId === parentId).map(d => d.id);
+                let result = [...children];
+                for(let childId of children) result = result.concat(getDescendants(childId));
+                return result;
+            }
+            
+            const idsToDelete = getDescendants(docId);
+            idsToDelete.push(docId); 
+
+            const msg = idsToDelete.length > 1 
+                ? `このドキュメントと ${idsToDelete.length - 1} 個の子ドキュメントを削除しますか？`
+                : `このドキュメントを削除しますか？`;
+                
+            if(!confirm(msg)) return;
+
+            list = list.filter(d => !idsToDelete.includes(d.id));
+            await dbDocList.setItem('list', list);
+
+            for(let id of idsToDelete) {
+                await dbDoc.removeItem(id);
+                dbChat.keys().then(keys => {
+                    keys.forEach(async k => {
+                        const item = await dbChat.getItem(k);
+                        if(item && item.docId === id) await dbChat.removeItem(k);
+                    });
                 });
-                docListEl.appendChild(div);
-            });
+                dbHistory.keys().then(keys => {
+                    keys.forEach(async k => {
+                        const item = await dbHistory.getItem(k);
+                        if(item && item.docId === id) await dbHistory.removeItem(k);
+                    });
+                });
+            }
+
+            if (idsToDelete.includes(currentDocId)) {
+                if (list.length > 0) {
+                    currentDocId = list[0].id;
+                } else {
+                    await createNewDocument(null);
+                    return;
+                }
+            }
+            
+            renderDocList(list);
+            if (idsToDelete.includes(currentDocId) || list.length > 0) {
+                await loadDocument();
+            }
+            showToast('削除しました', 'success');
+        }
+
+        async function moveDocument(docId, newParentId) {
+            let list = await dbDocList.getItem('list') || [];
+            
+            function isDescendant(parentId, childId) {
+                if (parentId === childId) return true;
+                let curr = list.find(d => d.id === childId);
+                while(curr && curr.parentId) {
+                    if (curr.parentId === parentId) return true;
+                    curr = list.find(d => d.id === curr.parentId);
+                }
+                return false;
+            }
+
+            if (newParentId !== null && isDescendant(docId, newParentId)) {
+                showToast('自身の階層下には移動できません', 'warning');
+                return;
+            }
+
+            let depth = 1;
+            let curr = list.find(d => d.id === newParentId);
+            while(curr && curr.parentId) {
+                depth++;
+                curr = list.find(d => d.id === curr.parentId);
+            }
+            
+            function getMaxDepth(id) {
+                let max = 0;
+                const children = list.filter(d => d.parentId === id);
+                for(let child of children) {
+                    max = Math.max(max, getMaxDepth(child.id) + 1);
+                }
+                return max;
+            }
+            const itemDepth = getMaxDepth(docId);
+            
+            if (newParentId !== null && depth + itemDepth >= 10) {
+                showToast('最大10階層を超えるため移動できません', 'warning');
+                return;
+            }
+
+            const doc = list.find(d => d.id === docId);
+            if (doc) {
+                doc.parentId = newParentId;
+                if (newParentId !== null) {
+                    const parent = list.find(d => d.id === newParentId);
+                    if (parent) parent.isExpanded = true;
+                }
+                await dbDocList.setItem('list', list);
+                renderDocList(list);
+                showToast('移動しました', 'success');
+            }
+        }
+
+        function renderDocList(list) {
+            docListEl.innerHTML = ''; 
+            list.sort((a, b) => b.updatedAt - a.updatedAt);
+            
+            function build(parentId, depth) {
+                const children = list.filter(d => d.parentId === parentId);
+                
+                // 階層ごとにフォルダ(子を持つ)を先、ファイル(子を持たない)を後にし、
+                // それぞれの中でタイトル名で昇順にソート
+                children.sort((a, b) => {
+                    const aHasChild = list.some(d => d.parentId === a.id);
+                    const bHasChild = list.some(d => d.parentId === b.id);
+                    if (aHasChild !== bHasChild) return aHasChild ? -1 : 1;
+                    return (a.title || '無題').localeCompare(b.title || '無題', 'ja');
+                });
+
+                children.forEach(doc => {
+                    const hasChildren = list.some(d => d.parentId === doc.id);
+                    
+                    const div = document.createElement('div');
+                    const isAct = doc.id === currentDocId;
+                    div.className = `group flex items-center p-1.5 rounded text-xs sm:text-sm transition mb-0.5 cursor-pointer hover:bg-slate-200 border border-transparent ${isAct ? 'bg-primary/10 text-primary font-bold' : 'text-slate-600'}`;
+                    div.style.paddingLeft = `${depth * 16 + 4}px`;
+                    
+                    // トグルボタン
+                    const toggleBtn = document.createElement('button');
+                    toggleBtn.className = 'w-5 h-5 flex items-center justify-center shrink-0 text-slate-400 hover:text-primary transition rounded';
+                    if (hasChildren) {
+                        toggleBtn.innerHTML = doc.isExpanded ? '<i class="fa-solid fa-chevron-down text-[10px]"></i>' : '<i class="fa-solid fa-chevron-right text-[10px]"></i>';
+                        toggleBtn.onclick = async (e) => {
+                            e.stopPropagation();
+                            doc.isExpanded = !doc.isExpanded;
+                            await dbDocList.setItem('list', list);
+                            renderDocList(list);
+                        };
+                    } else {
+                        toggleBtn.innerHTML = '<i class="fa-solid fa-minus text-[8px] opacity-30"></i>';
+                        toggleBtn.disabled = true;
+                    }
+                    div.appendChild(toggleBtn);
+
+                    // タイトル・アイコン
+                    const titleDiv = document.createElement('div');
+                    titleDiv.className = 'flex-1 truncate flex items-center ml-1';
+                    titleDiv.innerHTML = `<i class="fa-regular ${hasChildren ? (doc.isExpanded ? 'fa-folder-open' : 'fa-folder') : 'fa-file-lines'} mr-1.5 ${isAct?'text-primary':'text-slate-400'}"></i>${doc.title}`;
+                    titleDiv.onclick = async (e) => {
+                        e.stopPropagation();
+                        if (currentDocId !== doc.id) { 
+                            await saveDocument(); currentDocId = doc.id; 
+                            renderDocList(await dbDocList.getItem('list')); 
+                            await loadDocument(); 
+                            if (window.innerWidth <= 768) document.getElementById('btn-close-left-sidebar').click(); 
+                        }
+                    };
+                    div.appendChild(titleDiv);
+
+                    // アクションボタン群
+                    const actionsDiv = document.createElement('div');
+                    actionsDiv.className = 'flex items-center gap-1 opacity-100 md:opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity shrink-0';
+                    
+                    const addBtn = document.createElement('button');
+                    addBtn.className = 'w-5 h-5 flex items-center justify-center text-slate-400 hover:text-primary rounded bg-white/50 hover:bg-white shadow-sm';
+                    addBtn.innerHTML = '<i class="fa-solid fa-plus text-[10px]"></i>';
+                    addBtn.title = "子ドキュメントを追加";
+                    addBtn.onclick = (e) => { e.stopPropagation(); createNewDocument(doc.id); };
+                    
+                    const delBtn = document.createElement('button');
+                    delBtn.className = 'w-5 h-5 flex items-center justify-center text-slate-400 hover:text-red-500 rounded bg-white/50 hover:bg-white shadow-sm';
+                    delBtn.innerHTML = '<i class="fa-solid fa-trash text-[10px]"></i>';
+                    delBtn.title = "削除";
+                    delBtn.onclick = (e) => { e.stopPropagation(); deleteDocument(doc.id); };
+
+                    actionsDiv.appendChild(addBtn);
+                    actionsDiv.appendChild(delBtn);
+                    div.appendChild(actionsDiv);
+                    
+                    // ドラッグ&ドロップ対応
+                    div.setAttribute('draggable', 'true');
+                    div.addEventListener('dragstart', (e) => {
+                        e.dataTransfer.setData('text/plain', doc.id);
+                        e.stopPropagation();
+                        setTimeout(() => e.target.classList.add('opacity-50'), 0);
+                    });
+                    div.addEventListener('dragend', (e) => {
+                        e.target.classList.remove('opacity-50');
+                        document.querySelectorAll('.drop-target').forEach(el => el.classList.remove('drop-target'));
+                    });
+                    div.addEventListener('dragover', (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        e.currentTarget.classList.add('drop-target');
+                    });
+                    div.addEventListener('dragleave', (e) => {
+                        e.currentTarget.classList.remove('drop-target');
+                    });
+                    div.addEventListener('drop', async (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        e.currentTarget.classList.remove('drop-target');
+                        const draggedId = e.dataTransfer.getData('text/plain');
+                        if (draggedId && draggedId !== doc.id) {
+                            await moveDocument(draggedId, doc.id);
+                        }
+                    });
+
+                    docListEl.appendChild(div);
+
+                    if (doc.isExpanded && hasChildren) {
+                        build(doc.id, depth + 1);
+                    }
+                });
+            }
+            build(null, 0);
         }
 
         async function loadDocument() {
@@ -1174,7 +1419,7 @@
         }
 
         async function saveDocument() {
-            if (!currentDocId || isProcessing) return; // 処理中は状態保護のためスキップ
+            if (!currentDocId || isProcessing) return; 
             const content = editor.value; const title = docTitleInput.value.trim() || '無題';
             await dbDoc.setItem(currentDocId, { id: currentDocId, content, lastModified: new Date().toISOString() });
             let list = await dbDocList.getItem('list') || [];
@@ -1184,7 +1429,7 @@
         }
 
         function updateSaveStatus(text, colorClass, iconClass) {
-            if(isProcessing) return; // 処理中はステータスを上書きしない
+            if(isProcessing) return;
             saveStatus.className = `text-[10px] sm:text-xs whitespace-nowrap ${colorClass}`;
             saveStatus.innerHTML = `<i class="fa-solid ${iconClass}"></i> ${text}`;
         }
@@ -1197,7 +1442,7 @@
             await dbHistory.setItem(ver.id, ver);
             
             const keys = await dbHistory.keys();
-            let versions = (await Promise.all(keys.map(k => dbHistory.getItem(k)))).filter(v => v.docId === currentDocId).sort((a,b)=> new Date(b.timestamp)-new Date(a.timestamp));
+            let versions = (await Promise.all(keys.map(k => dbHistory.getItem(k)))).filter(v => v && v.docId === currentDocId).sort((a,b)=> new Date(b.timestamp)-new Date(a.timestamp));
             if (versions.length > 5) {
                 for(let v of versions.slice(5)) await dbHistory.removeItem(v.id);
             }
@@ -1206,7 +1451,7 @@
 
         async function loadHistory() {
             const keys = await dbHistory.keys();
-            const versions = (await Promise.all(keys.map(k => dbHistory.getItem(k)))).filter(v => v.docId === currentDocId).sort((a,b)=> new Date(b.timestamp)-new Date(a.timestamp));
+            const versions = (await Promise.all(keys.map(k => dbHistory.getItem(k)))).filter(v => v && v.docId === currentDocId).sort((a,b)=> new Date(b.timestamp)-new Date(a.timestamp));
             historyList.innerHTML = '';
             versions.forEach(v => {
                 const date = new Date(v.timestamp); const tStr = `${date.getMonth()+1}/${date.getDate()} ${date.getHours().toString().padStart(2,'0')}:${date.getMinutes().toString().padStart(2,'0')}`;
