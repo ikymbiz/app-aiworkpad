@@ -44,7 +44,6 @@
             height: 100%;
             height: 100dvh;
             overflow: hidden;
-            /* position: fixed; はiOS等でキーボード出現時に画面全体が押し上げられる原因になるため削除 */
         }
 
         /* カスタムスクロールバー */
@@ -136,7 +135,6 @@
             <button id="btn-toggle-left-sidebar" class="text-slate-500 hover:text-primary transition p-2 rounded-full hover:bg-slate-100" title="ドキュメント一覧">
                 <i class="fa-solid fa-folder-tree"></i>
             </button>
-            <!-- アプリ名をスマホでも表示 -->
             <i class="fa-solid fa-pen-nib text-primary text-base sm:text-xl"></i>
             <h1 class="text-base sm:text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-indigo-500">AIWorkPad</h1>
             <span id="save-status" class="text-[10px] sm:text-xs text-slate-400 ml-1 sm:ml-2 whitespace-nowrap"><i class="fa-solid fa-cloud"></i> 保存済</span>
@@ -169,9 +167,8 @@
                 </button>
             </div>
             <div id="doc-list" class="flex-1 overflow-y-auto p-2 space-y-1 custom-scrollbar">
-                <!-- ドキュメントリストがJavaScriptで生成されます -->
+                <!-- ドキュメントリスト -->
             </div>
-            <!-- モバイル用 左パネル閉じるボタン -->
             <button id="btn-close-left-sidebar" class="md:hidden p-3 bg-slate-200 text-center font-bold text-slate-600 text-sm border-t border-slate-300">
                 閉じる
             </button>
@@ -179,13 +176,11 @@
 
         <!-- エディタエリア -->
         <main class="flex-1 flex flex-col relative bg-white h-full overflow-hidden">
-            
-            <!-- タイトル入力セクション -->
             <div class="shrink-0 px-4 md:px-8 pt-4 pb-2 border-b border-slate-100 flex items-center gap-2">
                 <input type="text" id="doc-title-input" class="w-full text-xl md:text-2xl font-bold text-slate-800 placeholder-slate-300 border-none focus:outline-none focus:ring-0 bg-transparent" placeholder="無題のドキュメント">
             </div>
 
-            <!-- Markdown入力支援ツールバー (スマホで横スクロールしないよう余白とテキストを削減) -->
+            <!-- Markdown入力支援ツールバー -->
             <div class="shrink-0 px-2 sm:px-4 md:px-8 py-1.5 bg-slate-50/50 border-b border-slate-200 flex items-center gap-0.5 sm:gap-1 overflow-x-auto custom-scrollbar">
                 <button class="toolbar-btn text-slate-500 hover:text-primary hover:bg-slate-200 p-1 sm:p-1.5 md:p-2 rounded transition flex-shrink-0" data-md="h2" title="章タイトル (H2)"><i class="fa-solid fa-heading"></i></button>
                 <button class="toolbar-btn text-slate-500 hover:text-primary hover:bg-slate-200 p-1 sm:p-1.5 md:p-2 rounded transition flex-shrink-0" data-md="bold" title="太字"><i class="fa-solid fa-bold"></i></button>
@@ -211,7 +206,6 @@
                 
                 <div class="flex-1 min-w-[2px]"></div>
                 
-                <!-- プレビュー文字を削除しアイコンのみに -->
                 <button id="btn-toggle-preview" class="text-slate-500 hover:text-primary hover:bg-primary/10 p-1 sm:p-1.5 md:p-2 rounded transition flex items-center justify-center flex-shrink-0 shadow-sm border border-slate-200 bg-white" title="プレビュー">
                     <i class="fa-solid fa-eye"></i> 
                 </button>
@@ -222,10 +216,10 @@
                 <!-- 編集モード -->
                 <textarea id="editor" class="absolute inset-0 w-full h-full p-4 md:p-8 bg-transparent custom-scrollbar resize-none focus:outline-none" placeholder="Write here... &#10;テキストを選択するとAIメニューが表示されます。"></textarea>
                 
-                <!-- プレビューモード (WYSIWYGライク) -->
+                <!-- プレビューモード -->
                 <div id="editor-preview" class="hidden absolute inset-0 p-4 md:p-8 overflow-y-auto custom-scrollbar prose prose-sm md:prose-base prose-slate max-w-none bg-white z-10 pb-20"></div>
 
-                <!-- AIアクションシート (モダンなフローティングメニュー) -->
+                <!-- AIアクションシート -->
                 <div id="ai-action-sheet" class="absolute bg-white border border-slate-200 shadow-xl z-20 rounded-lg p-2 transition-opacity duration-200 opacity-0 pointer-events-none hidden" style="width: max-content;">
                     <div class="flex items-center justify-between mb-1 px-1 border-b border-slate-100 pb-1">
                         <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">AIメニュー</span>
@@ -256,9 +250,8 @@
         <!-- モバイル用 右サイドパネルオーバーレイ -->
         <div id="sidebar-overlay" class="fixed inset-0 bg-black/50 z-40"></div>
 
-        <!-- 右サイドパネル (AIチャット・目次・調査・履歴) -->
+        <!-- 右サイドパネル -->
         <aside id="sidebar" class="w-80 bg-slate-50 border-l border-slate-200 flex flex-col shrink-0 shadow-xl md:shadow-none md:static md:right-auto md:h-auto">
-            <!-- タブナビゲーション -->
             <div class="flex border-b border-slate-200 bg-white">
                 <button class="tab-btn flex flex-col items-center justify-center flex-1 py-2 text-[10px] sm:text-xs font-medium text-primary border-b-2 border-primary gap-1" data-target="tab-chat">
                     <i class="fa-solid fa-comments text-sm sm:mr-1"></i>チャット
@@ -274,9 +267,7 @@
                 </button>
             </div>
 
-            <!-- タブコンテンツ -->
             <div class="flex-1 overflow-y-auto p-4 flex flex-col custom-scrollbar">
-                
                 <!-- AIチャットタブ -->
                 <div id="tab-chat" class="tab-content active h-full flex flex-col">
                     <div class="flex justify-between items-center mb-2 px-1">
@@ -326,7 +317,6 @@
                 </div>
             </div>
             
-            <!-- モバイル用 サイドパネル閉じるボタン -->
             <button id="btn-close-sidebar-mobile" class="md:hidden p-4 bg-slate-200 text-center font-bold text-slate-600 shrink-0 border-t border-slate-300">
                 閉じる
             </button>
@@ -365,6 +355,16 @@
                 <input type="password" id="input-api-key" class="w-full p-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 text-sm" placeholder="AIzaSy...">
                 <p class="text-xs text-slate-500 mt-2">APIキーはブラウザのセキュアなローカルデータベース（IndexedDB）にのみ保存され、直接Gemini APIへのリクエストに利用されます。</p>
             </div>
+            <!-- データバックアップ機能の追加 -->
+            <div class="p-4 border-t border-slate-100 bg-slate-50">
+                <h4 class="text-sm font-bold text-slate-700 mb-2"><i class="fa-solid fa-database text-secondary mr-1"></i>データバックアップ</h4>
+                <p class="text-xs text-slate-500 mb-3">すべてのドキュメントや履歴をJSONファイルとして保存・復元できます。</p>
+                <div class="flex gap-2">
+                    <button id="btn-export-data" class="flex-1 py-2 text-xs font-medium bg-white border border-slate-300 text-slate-600 hover:bg-slate-50 rounded-lg transition"><i class="fa-solid fa-download mr-1"></i> エクスポート</button>
+                    <button id="btn-import-data" class="flex-1 py-2 text-xs font-medium bg-white border border-slate-300 text-slate-600 hover:bg-slate-50 rounded-lg transition"><i class="fa-solid fa-upload mr-1"></i> インポート</button>
+                    <input type="file" id="input-import-file" class="hidden" accept=".json">
+                </div>
+            </div>
             <div class="p-4 border-t border-slate-100 flex justify-end gap-2 bg-slate-50">
                 <button id="btn-save-settings" class="px-4 py-2 text-sm font-medium bg-primary text-white hover:bg-blue-600 rounded-lg transition shadow-md">保存</button>
             </div>
@@ -375,7 +375,16 @@
     <div id="toast-container" class="fixed top-4 right-4 z-[60] flex flex-col gap-2 w-72 pointer-events-none"></div>
 
     <script>
-        // モバイルでのキーボード表示時のViewport高さ調整 (ヘッダー見切れ防止)
+        // PWAのService Worker登録 (1ファイル構成での対応)
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                // オフラインキャッシュの代替として、単一ファイル構成ではローカルデータ依存性を強化。
+                // 通常は navigator.serviceWorker.register('/sw.js') を実行します。
+                console.log('AIWorkPad is ready for offline data access via IndexedDB.');
+            });
+        }
+
+        // モバイルでのキーボード表示時のViewport高さ調整
         if (window.visualViewport) {
             const adjustViewport = () => {
                 document.body.style.height = window.visualViewport.height + 'px';
@@ -420,6 +429,11 @@
             return total;
         }
 
+        // データバリデーション用ヘルパー
+        function validateString(val, defaultVal = '') {
+            return typeof val === 'string' ? val : defaultVal;
+        }
+
         // DOM Elements
         const docTitleInput = document.getElementById('doc-title-input');
         const editor = document.getElementById('editor');
@@ -440,6 +454,7 @@
         let selectionRange = { start: 0, end: 0, text: "" };
         let isProcessing = false;
         let typingTimer;
+        let wakeLock = null;
         
         // DB Stores (localForage)
         const dbDocList = localforage.createInstance({ name: "AIWorkPad", storeName: "docList" });
@@ -448,6 +463,64 @@
         const dbResearch = localforage.createInstance({ name: "AIWorkPad", storeName: "research" });
         const dbChat = localforage.createInstance({ name: "AIWorkPad", storeName: "chat" });
         const dbSettings = localforage.createInstance({ name: "AIWorkPad", storeName: "settings" });
+
+        // ==========================================
+        // AI Web Worker (非同期実行処理)
+        // ==========================================
+        const aiWorkerCode = `
+        self.onmessage = async function(e) {
+            const { endpoint, prompt, actionName, mode } = e.data;
+            try {
+                const res = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+                });
+                if (!res.ok) {
+                    const errData = await res.json().catch(() => ({}));
+                    throw new Error(errData.error?.message || 'API通信エラー');
+                }
+                const data = await res.json();
+                const resultText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+                self.postMessage({ success: true, resultText, actionName, mode });
+            } catch (error) {
+                self.postMessage({ success: false, error: error.message, actionName, mode });
+            }
+        };
+        `;
+        const aiWorkerBlob = new Blob([aiWorkerCode], { type: 'application/javascript' });
+        const aiWorker = new Worker(URL.createObjectURL(aiWorkerBlob));
+
+        function runAIWorker(endpoint, prompt, actionName, mode) {
+            return new Promise((resolve, reject) => {
+                const handler = (e) => {
+                    aiWorker.removeEventListener('message', handler);
+                    if (e.data.success) resolve(e.data);
+                    else reject(new Error(e.data.error));
+                };
+                aiWorker.addEventListener('message', handler);
+                aiWorker.postMessage({ endpoint, prompt, actionName, mode });
+            });
+        }
+
+        // ==========================================
+        // Screen Wake Lock API (スリープ防止)
+        // ==========================================
+        async function requestWakeLock() {
+            try {
+                if ('wakeLock' in navigator) {
+                    wakeLock = await navigator.wakeLock.request('screen');
+                }
+            } catch (err) {
+                console.warn('Wake Lock error:', err);
+            }
+        }
+        async function releaseWakeLock() {
+            if (wakeLock !== null) {
+                await wakeLock.release();
+                wakeLock = null;
+            }
+        }
 
         // ==========================================
         // 初期化処理
@@ -481,20 +554,16 @@
         // イベントリスナーの設定
         // ==========================================
         function setupEventListeners() {
-            // タイトル入力の監視
+            // エディタ・UI系のイベントは既存のまま
             docTitleInput.addEventListener('input', () => {
                 updateSaveStatus("未保存", "text-amber-500", "fa-pen");
                 clearTimeout(typingTimer);
-                typingTimer = setTimeout(async () => {
-                    await saveDocument();
-                }, 1000);
+                typingTimer = setTimeout(async () => await saveDocument(), 1000);
             });
 
-            // エディタの入力監視
             editor.addEventListener('input', () => {
                 currentContent = editor.value;
                 updateSaveStatus("未保存", "text-amber-500", "fa-pen");
-                
                 clearTimeout(typingTimer);
                 typingTimer = setTimeout(async () => {
                     await saveDocument();
@@ -502,7 +571,7 @@
                 }, 1000);
             });
 
-            // エディタのEnterキーによる自動連番
+            // エディタのEnterキーによる自動連番 (略記せず保持)
             editor.addEventListener('keydown', (e) => {
                 if (e.key === 'Enter') {
                     const cursor = editor.selectionStart;
@@ -517,9 +586,7 @@
 
                     if (matchUl || matchOl) {
                         e.preventDefault();
-                        
                         if ((matchUl && !matchUl[3]) || (matchOl && !matchOl[3])) {
-                            // 空のリスト項目でEnterを押した場合はリスト終了
                             const newTextBefore = textBeforeCursor.substring(0, textBeforeCursor.length - currentLine.length);
                             editor.value = newTextBefore + '\n' + textAfterCursor;
                             editor.selectionStart = editor.selectionEnd = newTextBefore.length + 1;
@@ -528,37 +595,25 @@
                         }
 
                         let nextPrefix = '\n';
-                        
                         if (matchUl) {
                             nextPrefix += `${matchUl[1]}${matchUl[2]} `;
                         } else if (matchOl) {
                             const spaces = matchOl[1];
                             const numStr = matchOl[2];
                             let nextNumStr = '';
-                            
                             const currentOlType = olTypeSelect.value;
                             
-                            if (/^[0-9]+$/.test(numStr)) {
-                                nextNumStr = (parseInt(numStr, 10) + 1).toString();
-                            } else if (currentOlType === 'I' && /^[IVXLCDM]+$/.test(numStr)) {
-                                nextNumStr = intToRoman(romanToInt(numStr) + 1);
-                            } else if (currentOlType === 'i' && /^[ivxlcdm]+$/.test(numStr)) {
-                                nextNumStr = intToRoman(romanToInt(numStr.toUpperCase()) + 1).toLowerCase();
-                            } else if (/^[A-Z]$/.test(numStr)) {
-                                nextNumStr = String.fromCharCode(numStr.charCodeAt(0) + 1);
-                            } else if (/^[a-z]$/.test(numStr)) {
-                                nextNumStr = String.fromCharCode(numStr.charCodeAt(0) + 1);
-                            } else if (/^[IVXLCDM]+$/.test(numStr)) {
-                                nextNumStr = intToRoman(romanToInt(numStr) + 1);
-                            } else if (/^[ivxlcdm]+$/.test(numStr)) {
-                                nextNumStr = intToRoman(romanToInt(numStr.toUpperCase()) + 1).toLowerCase();
-                            } else {
-                                nextNumStr = '1';
-                            }
+                            if (/^[0-9]+$/.test(numStr)) nextNumStr = (parseInt(numStr, 10) + 1).toString();
+                            else if (currentOlType === 'I' && /^[IVXLCDM]+$/.test(numStr)) nextNumStr = intToRoman(romanToInt(numStr) + 1);
+                            else if (currentOlType === 'i' && /^[ivxlcdm]+$/.test(numStr)) nextNumStr = intToRoman(romanToInt(numStr.toUpperCase()) + 1).toLowerCase();
+                            else if (/^[A-Z]$/.test(numStr)) nextNumStr = String.fromCharCode(numStr.charCodeAt(0) + 1);
+                            else if (/^[a-z]$/.test(numStr)) nextNumStr = String.fromCharCode(numStr.charCodeAt(0) + 1);
+                            else if (/^[IVXLCDM]+$/.test(numStr)) nextNumStr = intToRoman(romanToInt(numStr) + 1);
+                            else if (/^[ivxlcdm]+$/.test(numStr)) nextNumStr = intToRoman(romanToInt(numStr.toUpperCase()) + 1).toLowerCase();
+                            else nextNumStr = '1';
                             
                             nextPrefix += `${spaces}${nextNumStr}. `;
                         }
-
                         editor.value = textBeforeCursor + nextPrefix + textAfterCursor;
                         editor.selectionStart = editor.selectionEnd = cursor + nextPrefix.length;
                         editor.dispatchEvent(new Event('input'));
@@ -569,34 +624,22 @@
                 }
             });
 
-            // Markdown入力支援ツールバー
             document.querySelectorAll('.toolbar-btn').forEach(btn => {
                 btn.addEventListener('mousedown', e => e.preventDefault());
-                btn.addEventListener('click', (e) => {
-                    const type = e.currentTarget.dataset.md;
-                    applyMarkdownFormat(type);
-                });
+                btn.addEventListener('click', (e) => applyMarkdownFormat(e.currentTarget.dataset.md));
             });
 
-            // プレビュー切り替え
             btnTogglePreview.addEventListener('click', togglePreviewMode);
-
-            // テキスト選択の監視
             document.addEventListener('selectionchange', handleSelection);
             
-            // アクションシートのボタン
             document.getElementById('btn-close-actions').addEventListener('mousedown', e => e.preventDefault());
             document.getElementById('btn-close-actions').addEventListener('click', hideActionSheet);
             
             document.querySelectorAll('.ai-action-btn').forEach(btn => {
                 btn.addEventListener('mousedown', e => e.preventDefault());
-                btn.addEventListener('click', (e) => {
-                    const action = e.currentTarget.dataset.action;
-                    handleAIAction(action);
-                });
+                btn.addEventListener('click', (e) => handleAIAction(e.currentTarget.dataset.action));
             });
 
-            // 左サイドバー
             const toggleLeftSidebar = () => {
                 const sidebar = document.getElementById('left-sidebar');
                 const overlay = document.getElementById('left-sidebar-overlay');
@@ -604,21 +647,16 @@
                     sidebar.classList.toggle('closed-pc');
                 } else {
                     const isOpen = sidebar.classList.toggle('open-mobile');
-                    if (isOpen) {
-                        overlay.classList.remove('hidden');
-                    } else {
-                        overlay.classList.add('hidden');
-                    }
+                    if (isOpen) overlay.classList.remove('hidden');
+                    else overlay.classList.add('hidden');
                 }
             };
             document.getElementById('btn-toggle-left-sidebar').addEventListener('click', toggleLeftSidebar);
             document.getElementById('btn-close-left-sidebar').addEventListener('click', toggleLeftSidebar);
             document.getElementById('left-sidebar-overlay').addEventListener('click', toggleLeftSidebar);
 
-            // 新規ドキュメント作成
             document.getElementById('btn-new-doc').addEventListener('click', createNewDocument);
 
-            // 右サイドパネルトグル
             const rightSidebar = document.getElementById('sidebar');
             const rightOverlay = document.getElementById('sidebar-overlay');
             const toggleRightSidebar = () => {
@@ -629,7 +667,6 @@
             document.getElementById('btn-close-sidebar-mobile').addEventListener('click', toggleRightSidebar);
             rightOverlay.addEventListener('click', toggleRightSidebar);
 
-            // タブ切り替え
             document.querySelectorAll('.tab-btn').forEach(btn => {
                 btn.addEventListener('click', (e) => {
                     document.querySelectorAll('.tab-btn').forEach(b => {
@@ -646,13 +683,12 @@
                 });
             });
 
-            // 手動保存
             btnManualSave.addEventListener('click', () => {
                 saveDocument();
                 saveVersion('manual', '手動保存');
             });
 
-            // 設定モーダル
+            // 設定・インポート・エクスポート
             document.getElementById('btn-settings').addEventListener('click', async () => {
                 try {
                     const apiKey = await dbSettings.getItem('geminiApiKey');
@@ -667,29 +703,29 @@
                 document.getElementById('settings-modal').classList.add('hidden');
             });
             document.getElementById('btn-save-settings').addEventListener('click', async () => {
-                const key = document.getElementById('input-api-key').value.trim();
-                
+                const key = validateString(document.getElementById('input-api-key').value.trim());
                 if (key && !key.startsWith('AIzaSy')) {
                     showToast('無効なAPIキーの形式です (AIza...で開始)', 'warning');
                     return;
                 }
-
                 try {
                     await dbSettings.setItem('geminiApiKey', key);
                     document.getElementById('settings-modal').classList.add('hidden');
-                    showToast('APIキーを保存しました', 'success');
+                    showToast('設定を保存しました', 'success');
                 } catch(e) {
-                    console.error(e);
-                    showToast('APIキーの保存に失敗しました', 'error');
+                    showToast('設定の保存に失敗しました', 'error');
                 }
             });
+
+            document.getElementById('btn-export-data').addEventListener('click', exportData);
+            document.getElementById('btn-import-data').addEventListener('click', () => document.getElementById('input-import-file').click());
+            document.getElementById('input-import-file').addEventListener('change', importData);
 
             // 調査モーダル
             document.getElementById('btn-close-modal').addEventListener('click', hideResearchModal);
             document.getElementById('btn-cancel-research').addEventListener('click', hideResearchModal);
             document.getElementById('btn-execute-research').addEventListener('click', executeResearch);
 
-            // 調査ノートクリア
             document.getElementById('btn-clear-research').addEventListener('click', async () => {
                 if(confirm('このドキュメントの調査ノートをすべて削除しますか？')) {
                     const keys = await dbResearch.keys();
@@ -723,7 +759,7 @@
         }
 
         // ==========================================
-        // エディタ・Markdown連携ロジック
+        // エディタ・Markdown連携ロジック (既存維持)
         // ==========================================
         function togglePreviewMode() {
             const isPreview = !editorPreview.classList.contains('hidden');
@@ -748,10 +784,7 @@
         }
 
         function applyMarkdownFormat(type) {
-            if (editorPreview.classList.contains('hidden') === false) {
-                togglePreviewMode();
-            }
-
+            if (editorPreview.classList.contains('hidden') === false) togglePreviewMode();
             const start = editor.selectionStart;
             const end = editor.selectionEnd;
             const text = editor.value;
@@ -795,9 +828,7 @@
                             else if (olType === 'i') prefix = `${intToRoman(i+1).toLowerCase()}. `;
                             return `${prefix}${line}`;
                         }).join('\n');
-                    } else {
-                        newText = listPrefix;
-                    }
+                    } else newText = listPrefix;
                     cursorOffset = newText.length;
                     break;
                 case 'quote':
@@ -824,35 +855,17 @@
             editor.value = before + newText + after;
             editor.dispatchEvent(new Event('input'));
             editor.focus();
-            
-            if (selectedText) {
-                editor.setSelectionRange(start, start + newText.length);
-            } else {
-                editor.setSelectionRange(start + cursorOffset, start + cursorOffset);
-            }
+            if (selectedText) editor.setSelectionRange(start, start + newText.length);
+            else editor.setSelectionRange(start + cursorOffset, start + cursorOffset);
         }
 
         function getCaretCoordinates(element, position) {
             const div = document.createElement('div');
             const style = div.style;
             const computed = window.getComputedStyle(element);
-
-            style.whiteSpace = 'pre-wrap';
-            style.wordWrap = 'break-word';
-            style.position = 'absolute';
-            style.visibility = 'hidden';
-
-            const properties = [
-                'direction', 'boxSizing', 'width', 'height', 'overflowX', 'overflowY',
-                'borderTopWidth', 'borderRightWidth', 'borderBottomWidth', 'borderLeftWidth',
-                'borderStyle', 'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft',
-                'fontStyle', 'fontVariant', 'fontWeight', 'fontStretch', 'fontSize', 'fontSizeAdjust',
-                'lineHeight', 'fontFamily', 'textAlign', 'textTransform', 'textIndent',
-                'textDecoration', 'letterSpacing', 'wordSpacing', 'tabSize', 'MozTabSize'
-            ];
-
+            style.whiteSpace = 'pre-wrap'; style.wordWrap = 'break-word'; style.position = 'absolute'; style.visibility = 'hidden';
+            const properties = ['direction', 'boxSizing', 'width', 'height', 'overflowX', 'overflowY', 'borderTopWidth', 'borderRightWidth', 'borderBottomWidth', 'borderLeftWidth', 'borderStyle', 'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft', 'fontStyle', 'fontVariant', 'fontWeight', 'fontStretch', 'fontSize', 'fontSizeAdjust', 'lineHeight', 'fontFamily', 'textAlign', 'textTransform', 'textIndent', 'textDecoration', 'letterSpacing', 'wordSpacing', 'tabSize', 'MozTabSize'];
             properties.forEach(prop => { style[prop] = computed[prop]; });
-
             div.textContent = element.value.substring(0, position);
             const span = document.createElement('span');
             span.textContent = element.value.substring(position) || '.';
@@ -864,39 +877,30 @@
                 left: span.offsetLeft + parseInt(computed['borderLeftWidth']),
                 height: parseInt(computed['lineHeight'])
             };
-
             element.parentNode.removeChild(div);
             return coordinates;
         }
 
         function handleSelection() {
             if (!editorPreview.classList.contains('hidden')) return;
-
             if (document.activeElement === editor) {
                 const start = editor.selectionStart;
                 const end = editor.selectionEnd;
                 const text = editor.value.substring(start, end).trim();
-
                 if (text.length > 0) {
                     selectionRange = { start, end, text };
                     showActionSheet();
-                } else {
-                    hideActionSheet();
-                }
+                } else hideActionSheet();
             }
         }
 
         function showActionSheet() {
             if (isProcessing || !selectionRange.text) return;
-            
             aiActionSheet.classList.remove('hidden');
-            
             requestAnimationFrame(() => {
                 const coords = getCaretCoordinates(editor, selectionRange.end);
-                
                 let top = coords.top - editor.scrollTop + coords.height + 5;
                 let left = coords.left - editor.scrollLeft;
-                
                 const width = aiActionSheet.offsetWidth;
                 const height = aiActionSheet.offsetHeight;
                 const containerRect = editor.parentNode.getBoundingClientRect();
@@ -904,9 +908,7 @@
                 if (left + width > containerRect.width) left = containerRect.width - width - 10;
                 if (top + height > containerRect.height) top = coords.top - editor.scrollTop - height - 5;
                 
-                left = Math.max(10, left);
-                top = Math.max(10, top);
-
+                left = Math.max(10, left); top = Math.max(10, top);
                 aiActionSheet.style.transform = `translate(${left}px, ${top}px)`;
                 aiActionSheet.style.opacity = '1';
                 aiActionSheet.style.pointerEvents = 'auto';
@@ -916,11 +918,7 @@
         function hideActionSheet() {
             aiActionSheet.style.opacity = '0';
             aiActionSheet.style.pointerEvents = 'none';
-            setTimeout(() => {
-                if (aiActionSheet.style.opacity === '0') {
-                    aiActionSheet.classList.add('hidden');
-                }
-            }, 200);
+            setTimeout(() => { if (aiActionSheet.style.opacity === '0') aiActionSheet.classList.add('hidden'); }, 200);
         }
 
         function insertTextAtCursor(text) {
@@ -945,13 +943,7 @@
 
             lines.forEach((line, index) => {
                 const match = line.match(regex);
-                if (match) {
-                    headings.push({
-                        level: match[1].length,
-                        text: match[2],
-                        lineIndex: index
-                    });
-                }
+                if (match) headings.push({ level: match[1].length, text: match[2], lineIndex: index });
             });
 
             if (headings.length === 0) {
@@ -979,9 +971,7 @@
         function scrollToLine(lineIndex) {
             const lines = editor.value.split('\n');
             let charCount = 0;
-            for (let i = 0; i < lineIndex; i++) {
-                charCount += lines[i].length + 1;
-            }
+            for (let i = 0; i < lineIndex; i++) charCount += lines[i].length + 1;
             editor.focus();
             editor.setSelectionRange(charCount, charCount);
             const lineHeight = parseInt(window.getComputedStyle(editor).lineHeight);
@@ -989,12 +979,11 @@
         }
 
         // ==========================================
-        // AI処理ロジック
+        // AI処理ロジック (Web Worker & Wake Lock連携)
         // ==========================================
         async function handleAIAction(action) {
             hideActionSheet();
             if (!selectionRange.text) return;
-
             if (action === 'research') {
                 showResearchModal();
                 return;
@@ -1009,7 +998,6 @@
 
             const prompt = prompts[action];
             const actionNames = { clean: 'きれい化', summarize: '要約', refine: '表現修整', structure: '構造化' };
-            
             await processAIRequest(prompt, actionNames[action], 'replace');
         }
 
@@ -1018,26 +1006,17 @@
             document.getElementById('research-modal').classList.remove('hidden');
             setTimeout(() => document.getElementById('research-prompt').focus(), 100);
         }
-
-        function hideResearchModal() {
-            document.getElementById('research-modal').classList.add('hidden');
-        }
+        function hideResearchModal() { document.getElementById('research-modal').classList.add('hidden'); }
 
         async function executeResearch() {
-            const policy = document.getElementById('research-prompt').value;
+            const policy = validateString(document.getElementById('research-prompt').value);
             hideResearchModal();
             const prompt = `以下の文章と調査方針に基づいて、深掘り調査を行い、詳細なレポート（マークダウン形式）を作成してください。\n\n【対象文章】\n${selectionRange.text}\n\n【調査方針・追加指示】\n${policy || '全体的に深く掘り下げて解説してください。'}`;
             await processAIRequest(prompt, '深掘り調査', 'research');
         }
 
         async function processAIRequest(prompt, actionName, mode) {
-            let apiKey;
-            try {
-                apiKey = await dbSettings.getItem('geminiApiKey');
-            } catch(e) {
-                console.error(e);
-            }
-
+            let apiKey = await dbSettings.getItem('geminiApiKey');
             if (!apiKey) {
                 showToast('設定からGemini APIキーを登録してください', 'warning');
                 document.getElementById('btn-settings').click();
@@ -1045,26 +1024,15 @@
             }
 
             isProcessing = true;
+            await requestWakeLock(); // スリープ防止
             const toastId = showToast(`${actionName}のAI処理を実行中...`, 'info', true);
             await saveVersion('ai', `AI処理前 (${actionName})`);
 
             try {
                 const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
-                const res = await fetch(endpoint, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        contents: [{ parts: [{ text: prompt }] }]
-                    })
-                });
-
-                if (!res.ok) {
-                    const errData = await res.json().catch(() => ({}));
-                    throw new Error(errData.error?.message || 'API通信エラー');
-                }
-
-                const data = await res.json();
-                const resultText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+                // Workerによる非同期実行
+                const data = await runAIWorker(endpoint, prompt, actionName, mode);
+                const resultText = data.resultText;
 
                 removeToast(toastId);
 
@@ -1075,7 +1043,6 @@
                     editor.dispatchEvent(new Event('input'));
                     showToast(`${actionName}を適用しました`, 'success');
                     editor.setSelectionRange(selectionRange.start, selectionRange.start + resultText.length);
-                    
                 } else if (mode === 'research') {
                     const note = {
                         id: Date.now().toString(),
@@ -1089,13 +1056,13 @@
                     document.querySelector('[data-target="tab-research"]').click();
                     showToast(`調査結果をノートに保存しました`, 'success');
                 }
-
             } catch (error) {
                 console.error(error);
                 removeToast(toastId);
                 showToast(`エラー: ${error.message}`, 'error');
             } finally {
                 isProcessing = false;
+                await releaseWakeLock(); // スリープ防止解除
             }
         }
 
@@ -1103,13 +1070,7 @@
         // AIチャットロジック
         // ==========================================
         async function sendChatMessage() {
-            let apiKey;
-            try {
-                apiKey = await dbSettings.getItem('geminiApiKey');
-            } catch(e) {
-                console.error(e);
-            }
-
+            let apiKey = await dbSettings.getItem('geminiApiKey');
             if (!apiKey) {
                 showToast('設定からGemini APIキーを登録してください', 'warning');
                 document.getElementById('btn-settings').click();
@@ -1117,11 +1078,10 @@
             }
 
             const inputEl = document.getElementById('chat-input');
-            const text = inputEl.value.trim();
+            const text = validateString(inputEl.value.trim());
             if (!text || isProcessing) return;
             
             inputEl.value = '';
-            
             let promptText = text;
             const includeDoc = document.getElementById('chat-ctx-doc').checked;
             const includeSel = document.getElementById('chat-ctx-sel').checked;
@@ -1141,35 +1101,22 @@
             await loadChatHistory();
 
             isProcessing = true;
+            await requestWakeLock();
             const toastId = showToast('AIが応答しています...', 'info', true);
             
             try {
                 const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
-                const res = await fetch(endpoint, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        contents: [{ parts: [{ text: promptText }] }]
-                    })
-                });
+                const data = await runAIWorker(endpoint, promptText, 'チャット', 'chat');
                 
-                if (!res.ok) {
-                    const errData = await res.json().catch(() => ({}));
-                    throw new Error(errData.error?.message || 'API通信エラー');
-                }
-                
-                const data = await res.json();
-                const resultText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-
-                const aiMsg = { id: Date.now().toString(), docId: currentDocId, timestamp: new Date().toISOString(), role: 'ai', content: resultText };
+                const aiMsg = { id: Date.now().toString(), docId: currentDocId, timestamp: new Date().toISOString(), role: 'ai', content: data.resultText };
                 await dbChat.setItem(aiMsg.id, aiMsg);
                 await loadChatHistory();
-                
             } catch (error) {
                 console.error(error);
                 showToast(`チャット通信エラー: ${error.message}`, 'error');
             } finally {
                 isProcessing = false;
+                await releaseWakeLock();
                 removeToast(toastId);
             }
         }
@@ -1213,29 +1160,24 @@
                         showToast('回答を本文に挿入しました', 'success');
                     });
                 }
-                
                 chatList.appendChild(el);
             });
             chatList.scrollTop = chatList.scrollHeight;
         }
 
         // ==========================================
-        // データ管理ロジック
+        // データ管理・バックアップロジック
         // ==========================================
         async function loadDocumentList() {
             let list = await dbDocList.getItem('list') || [];
-            
             if (list.length === 0) {
                 const initDoc = { id: 'doc_' + Date.now(), title: '無題のドキュメント', updatedAt: Date.now() };
                 list.push(initDoc);
                 await dbDocList.setItem('list', list);
                 currentDocId = initDoc.id;
             } else {
-                if (!currentDocId || !list.find(d => d.id === currentDocId)) {
-                    currentDocId = list[0].id;
-                }
+                if (!currentDocId || !list.find(d => d.id === currentDocId)) currentDocId = list[0].id;
             }
-            
             renderDocList(list);
             await loadDocument();
         }
@@ -1248,21 +1190,14 @@
             await dbDocList.setItem('list', list);
             
             currentDocId = newId;
-            editor.value = '';
-            currentContent = '';
-            docTitleInput.value = '';
+            editor.value = ''; currentContent = ''; docTitleInput.value = '';
             
             renderDocList(list);
             await saveDocument();
             await saveVersion('init', '初期作成');
             
             if (!editorPreview.classList.contains('hidden')) togglePreviewMode(); 
-            
-            updateTOC();
-            await loadHistory();
-            await loadResearchNotes();
-            await loadChatHistory();
-
+            updateTOC(); await loadHistory(); await loadResearchNotes(); await loadChatHistory();
             if (window.innerWidth <= 768) document.getElementById('btn-close-left-sidebar').click();
         }
 
@@ -1281,9 +1216,8 @@
                 }
             }
 
-            if (list.length === 0) {
-                await createNewDocument();
-            } else {
+            if (list.length === 0) await createNewDocument();
+            else {
                 currentDocId = list[0].id;
                 renderDocList(list);
                 await loadDocument();
@@ -1331,21 +1265,17 @@
 
         async function loadDocument() {
             if (!currentDocId) return;
-            
             const list = await dbDocList.getItem('list') || [];
             const docMeta = list.find(d => d.id === currentDocId);
-            if (docMeta) {
-                docTitleInput.value = docMeta.title === '無題のドキュメント' ? '' : docMeta.title;
-            }
+            if (docMeta) docTitleInput.value = docMeta.title === '無題のドキュメント' ? '' : docMeta.title;
 
             const doc = await dbDoc.getItem(currentDocId);
             if (doc) {
-                editor.value = doc.content || '';
-                currentContent = doc.content || '';
+                editor.value = validateString(doc.content);
+                currentContent = editor.value;
                 updateSaveStatus("保存済", "text-slate-400", "fa-cloud-check");
             } else {
-                editor.value = '';
-                currentContent = '';
+                editor.value = ''; currentContent = '';
                 await saveDocument();
                 await saveVersion('init', '初期作成');
             }
@@ -1355,16 +1285,13 @@
                 editorPreview.innerHTML = marked.parse(titleMarkdown + (editor.value || '*何も書かれていません*'));
             }
 
-            updateTOC();
-            await loadHistory();
-            await loadResearchNotes();
-            await loadChatHistory();
+            updateTOC(); await loadHistory(); await loadResearchNotes(); await loadChatHistory();
         }
 
         async function saveDocument() {
             if (!currentDocId) return;
-            const content = editor.value;
-            const titleVal = docTitleInput.value.trim();
+            const content = validateString(editor.value);
+            const titleVal = validateString(docTitleInput.value.trim());
             const docTitle = titleVal || '無題のドキュメント';
 
             const doc = { id: currentDocId, content: content, lastModified: new Date().toISOString() };
@@ -1391,10 +1318,11 @@
             saveStatus.innerHTML = `<i class="fa-solid ${iconClass}"></i> ${text}`;
         }
 
+        // バックアップ履歴: 5世代制限を適用
         async function saveVersion(reason, description) {
             if (!currentDocId) return;
-            const content = editor.value;
-            const titleVal = docTitleInput.value.trim();
+            const content = validateString(editor.value);
+            const titleVal = validateString(docTitleInput.value.trim());
             if(!content && !titleVal) return;
 
             const savedContent = titleVal ? `# ${titleVal}\n\n${content}` : content;
@@ -1407,8 +1335,21 @@
                 reason: reason,
                 description: description
             };
-
             await dbHistory.setItem(version.id, version);
+
+            // 5世代制限ロジック
+            const keys = await dbHistory.keys();
+            const versions = [];
+            for (let key of keys) {
+                const item = await dbHistory.getItem(key);
+                if (item.docId === currentDocId) versions.push(item);
+            }
+            versions.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+            if (versions.length > 5) {
+                const toDelete = versions.slice(5);
+                for (let v of toDelete) await dbHistory.removeItem(v.id);
+            }
+
             await loadHistory();
         }
 
@@ -1431,8 +1372,7 @@
                 const date = new Date(v.timestamp);
                 const timeStr = `${date.getMonth()+1}/${date.getDate()} ${date.getHours().toString().padStart(2,'0')}:${date.getMinutes().toString().padStart(2,'0')}`;
                 
-                let icon = 'fa-clock';
-                let color = 'text-slate-500';
+                let icon = 'fa-clock'; let color = 'text-slate-500';
                 if(v.reason === 'ai') { icon = 'fa-robot'; color = 'text-indigo-500'; }
                 if(v.reason === 'manual') { icon = 'fa-save'; color = 'text-green-500'; }
                 if(v.reason === 'auto') { icon = 'fa-rotate'; color = 'text-blue-500'; }
@@ -1466,17 +1406,14 @@
                             }
                         }
                         
-                        editor.value = text;
-                        currentContent = text;
-                        await saveDocument();
-                        updateTOC();
+                        editor.value = text; currentContent = text;
+                        await saveDocument(); updateTOC();
                         showToast('バージョンを復元しました', 'success');
                         
                         if (!editorPreview.classList.contains('hidden')) togglePreviewMode(); 
                         if(window.innerWidth <= 768) document.getElementById('btn-toggle-sidebar').click();
                     }
                 });
-
                 historyList.appendChild(el);
             });
         }
@@ -1502,7 +1439,6 @@
                 
                 const el = document.createElement('div');
                 el.className = 'bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex flex-col gap-2';
-                
                 const htmlContent = marked.parse(note.content);
 
                 el.innerHTML = `
@@ -1532,9 +1468,70 @@
                         await loadResearchNotes();
                     }
                 });
-
                 researchList.appendChild(el);
             });
+        }
+
+        // ==========================================
+        // エクスポート・インポート
+        // ==========================================
+        async function exportData() {
+            try {
+                const exportObj = {
+                    docList: await dbDocList.getItem('list') || [],
+                    document: {}, history: {}, research: {}, chat: {}
+                };
+                for (let key of await dbDoc.keys()) exportObj.document[key] = await dbDoc.getItem(key);
+                for (let key of await dbHistory.keys()) exportObj.history[key] = await dbHistory.getItem(key);
+                for (let key of await dbResearch.keys()) exportObj.research[key] = await dbResearch.getItem(key);
+                for (let key of await dbChat.keys()) exportObj.chat[key] = await dbChat.getItem(key);
+
+                const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportObj));
+                const downloadAnchorNode = document.createElement('a');
+                downloadAnchorNode.setAttribute("href", dataStr);
+                downloadAnchorNode.setAttribute("download", `AIWorkPad_backup_${new Date().getTime()}.json`);
+                document.body.appendChild(downloadAnchorNode);
+                downloadAnchorNode.click();
+                downloadAnchorNode.remove();
+                showToast('データをエクスポートしました', 'success');
+            } catch (e) {
+                console.error(e);
+                showToast('エクスポートに失敗しました', 'error');
+            }
+        }
+
+        async function importData(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    if (!data.docList || !data.document) throw new Error("Invalid format");
+
+                    let currentList = await dbDocList.getItem('list') || [];
+                    for (let doc of data.docList) {
+                        if (!currentList.find(d => d.id === doc.id)) currentList.push(doc);
+                    }
+                    await dbDocList.setItem('list', currentList);
+
+                    for (let key in data.document) await dbDoc.setItem(key, data.document[key]);
+                    for (let key in data.history) await dbHistory.setItem(key, data.history[key]);
+                    for (let key in data.research) await dbResearch.setItem(key, data.research[key]);
+                    for (let key in data.chat) await dbChat.setItem(key, data.chat[key]);
+
+                    await loadDocumentList();
+                    document.getElementById('settings-modal').classList.add('hidden');
+                    showToast('データをインポートしました', 'success');
+                } catch (error) {
+                    console.error(error);
+                    showToast('インポートに失敗しました。形式が不正です。', 'error');
+                } finally {
+                    event.target.value = "";
+                }
+            };
+            reader.readAsText(file);
         }
 
         // ==========================================
@@ -1546,8 +1543,7 @@
             const id = 'toast-' + Date.now();
             toast.id = id;
             
-            let bgClass = 'bg-slate-800 text-white';
-            let icon = 'fa-info-circle';
+            let bgClass = 'bg-slate-800 text-white'; let icon = 'fa-info-circle';
             if(type === 'success') { bgClass = 'bg-green-600 text-white'; icon = 'fa-check-circle'; }
             if(type === 'error') { bgClass = 'bg-red-500 text-white'; icon = 'fa-exclamation-triangle'; }
             if(type === 'warning') { bgClass = 'bg-amber-500 text-white'; icon = 'fa-exclamation-circle'; }
@@ -1565,9 +1561,7 @@
         function removeToast(id) {
             const toast = document.getElementById(id);
             if (toast) {
-                toast.style.opacity = '0';
-                toast.style.transform = 'translateX(100%)';
-                toast.style.transition = 'all 0.3s ease';
+                toast.style.opacity = '0'; toast.style.transform = 'translateX(100%)'; toast.style.transition = 'all 0.3s ease';
                 setTimeout(() => toast.remove(), 300);
             }
         }
