@@ -11,6 +11,7 @@ const CDN_CACHE = CACHE_VERSION + '-cdn';
 const APP_SHELL_URLS = [
     './',
     './index.html',
+    './sw.js',
 ];
 
 // CDN リソース — 初回アクセス時にキャッシュ

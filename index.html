@@ -13,155 +13,30 @@
     
     <title>AIWorkPad</title>
 
-    <!-- ==========================================
-         Service Worker ソースコード (埋め込み)
-         ブラウザ仕様上 sw.js は別ファイルが必須。
-         初回起動時に自動ダウンロードを案内する。
-         ========================================== -->
-    <script id="sw-source" type="text/sw-template">
-// AIWorkPad Service Worker v3.0
-const CACHE_VERSION = 'aiworkpad-v3.0';
-const APP_SHELL_CACHE = CACHE_VERSION + '-shell';
-const CDN_CACHE = CACHE_VERSION + '-cdn';
-
-const APP_SHELL_URLS = ['./', './index.html'];
-
-const CDN_URLS = [
-    'https://cdn.tailwindcss.com?plugins=typography',
-    'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css',
-    'https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js',
-    'https://cdn.jsdelivr.net/npm/marked/marked.min.js',
-    'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js',
-];
-
-const FONT_PATTERN = /cdnjs\.cloudflare\.com\/ajax\/libs\/font-awesome/;
-const API_PATTERNS = [/generativelanguage\.googleapis\.com/, /api\.anthropic\.com/];
-
-// Install
-self.addEventListener('install', (event) => {
-    event.waitUntil(
-        Promise.all([
-            caches.open(APP_SHELL_CACHE).then(c => c.addAll(APP_SHELL_URLS).catch(() => {})),
-            caches.open(CDN_CACHE).then(c => Promise.allSettled(CDN_URLS.map(u => c.add(u).catch(() => {})))),
-        ]).then(() => self.skipWaiting())
-    );
-});
-
-// Activate
-self.addEventListener('activate', (event) => {
-    event.waitUntil(
-        caches.keys().then(keys =>
-            Promise.all(keys.filter(k => !k.startsWith(CACHE_VERSION)).map(k => caches.delete(k)))
-        ).then(() => self.clients.claim())
-    );
-});
-
-// Fetch
-self.addEventListener('fetch', (event) => {
-    const url = new URL(event.request.url);
-    if (API_PATTERNS.some(p => p.test(url.href))) { event.respondWith(fetch(event.request)); return; }
-    if (!url.protocol.startsWith('http')) return;
-
-    if (FONT_PATTERN.test(url.href) || CDN_URLS.some(u => url.href.startsWith(u))) {
-        event.respondWith(
-            caches.match(event.request).then(c => c || fetch(event.request).then(r => {
-                if (r && r.ok) { const cl = r.clone(); caches.open(CDN_CACHE).then(ca => ca.put(event.request, cl)); }
-                return r;
-            }).catch(() => new Response('', { headers: { 'Content-Type': 'text/css' } })))
-        );
-        return;
-    }
-
-    if (event.request.mode === 'navigate' || url.pathname.endsWith('.html') || url.pathname === '/' || url.pathname.endsWith('/')) {
-        event.respondWith(
-            fetch(event.request).then(r => {
-                if (r && r.ok) { const cl = r.clone(); caches.open(APP_SHELL_CACHE).then(c => c.put(event.request, cl)); }
-                return r;
-            }).catch(() => caches.match(event.request).then(c => c || caches.match('./index.html')))
-        );
-        return;
-    }
-
-    event.respondWith(
-        caches.match(event.request).then(c => c || fetch(event.request).then(r => {
-            if (r && r.ok) { const cl = r.clone(); caches.open(CDN_CACHE).then(ca => ca.put(event.request, cl)); }
-            return r;
-        }))
-    );
-});
-
-self.addEventListener('message', (e) => { if (e.data === 'skipWaiting') self.skipWaiting(); });
-    </script>
-
-    <!-- SW 登録 + 未配置時の自動生成 -->
+    <!-- SW 登録 -->
     <script>
     (function() {
         if (!('serviceWorker' in navigator)) return;
 
-        // sw.js の存在チェック → 登録
         async function initSW() {
             try {
-                const res = await fetch('./sw.js', { method: 'HEAD' });
-                if (res.ok) {
-                    const reg = await navigator.serviceWorker.register('./sw.js');
-                    console.log('[App] SW registered:', reg.scope);
-                    reg.addEventListener('updatefound', () => {
-                        const nw = reg.installing;
-                        nw.addEventListener('statechange', () => {
-                            if (nw.state === 'installed' && navigator.serviceWorker.controller) {
-                                if (confirm('AIWorkPadの新バージョンがあります。更新しますか？')) {
-                                    nw.postMessage('skipWaiting');
-                                    location.reload();
-                                }
+                const reg = await navigator.serviceWorker.register('./sw.js');
+                console.log('[App] SW registered:', reg.scope);
+                reg.addEventListener('updatefound', () => {
+                    const nw = reg.installing;
+                    if (!nw) return;
+                    nw.addEventListener('statechange', () => {
+                        if (nw.state === 'installed' && navigator.serviceWorker.controller) {
+                            if (confirm('AIWorkPadの新バージョンがあります。更新しますか？')) {
+                                nw.postMessage('skipWaiting');
+                                location.reload();
                             }
-                        });
+                        }
                     });
-                } else {
-                    offerSWDownload();
-                }
+                });
             } catch (e) {
-                console.warn('[App] SW check failed:', e.message);
-                offerSWDownload();
+                console.warn('[App] SW registration failed:', e.message);
             }
-        }
-
-        // sw.js が存在しない場合 → 埋め込みコードからダウンロード生成
-        function offerSWDownload() {
-            const tmpl = document.getElementById('sw-source');
-            if (!tmpl) return;
-            const code = tmpl.textContent.trim();
-            const blob = new Blob([code], { type: 'application/javascript' });
-            const url = URL.createObjectURL(blob);
-
-            // 自動ダウンロード案内バナーを表示
-            const banner = document.createElement('div');
-            banner.id = 'sw-install-banner';
-            banner.style.cssText = 'position:fixed;bottom:0;left:0;right:0;z-index:9999;background:#1e40af;color:#fff;padding:12px 16px;display:flex;align-items:center;gap:12px;justify-content:center;font-size:14px;box-shadow:0 -2px 8px rgba(0,0,0,0.2);';
-            banner.innerHTML = `
-                <i class="fa-solid fa-download" style="font-size:18px;"></i>
-                <span>オフライン対応には <b>sw.js</b> が必要です</span>
-                <a id="sw-download-link" href="${url}" download="sw.js"
-                   style="background:#fff;color:#1e40af;padding:6px 16px;border-radius:6px;font-weight:bold;text-decoration:none;">
-                   sw.js をダウンロード
-                </a>
-                <button onclick="this.parentElement.remove()"
-                   style="background:transparent;border:none;color:#93c5fd;cursor:pointer;font-size:18px;margin-left:8px;">✕</button>
-            `;
-            document.body.appendChild(banner);
-
-            // ダウンロードクリック後にリロード案内
-            banner.querySelector('#sw-download-link').addEventListener('click', () => {
-                setTimeout(() => {
-                    banner.innerHTML = `
-                        <i class="fa-solid fa-check-circle" style="font-size:18px;color:#86efac;"></i>
-                        <span>sw.js を index.html と<b>同じフォルダ</b>に配置後、ページを再読み込みしてください</span>
-                        <button onclick="location.reload()"
-                           style="background:#fff;color:#1e40af;padding:6px 16px;border-radius:6px;font-weight:bold;border:none;cursor:pointer;">
-                           再読み込み
-                        </button>
-                    `;
-                }, 500);
-            });
         }
 
         window.addEventListener('load', initSW);
