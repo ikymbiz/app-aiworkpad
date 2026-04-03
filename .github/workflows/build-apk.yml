@@ -1,0 +1,211 @@
+name: Mobile App Builder
+
+on:
+  workflow_dispatch:
+    inputs:
+      app_name:
+        description: 'アプリの表示名'
+        default: 'My App'
+        required: true
+      app_id:
+        description: 'パッケージ名 (com.example.app)'
+        default: 'com.example.app'
+        required: true
+      source_type:
+        description: '取得元 (local / github)'
+        default: 'local'
+        required: true
+      source_path:
+        description: 'アセットのパス'
+        default: '/'
+        required: false
+      selected_files:
+        description: '対象ファイル (カンマ区切り)'
+        default: ''
+        required: false
+      source_repo:
+        description: 'ソースリポジトリ (owner/repo 形式、github モード時)'
+        default: ''
+        required: false
+      app_icon_base64:
+        description: 'アプリアイコン (Base64 PNG)'
+        default: ''
+        required: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+
+      - uses: actions/setup-java@v4
+        with: { distribution: 'temurin', java-version: '17' }
+
+      - name: Clean existing config files
+        run: |
+          rm -f package.json package-lock.json capacitor.config.json capacitor.config.ts
+          rm -rf node_modules android ios
+
+      - name: Configure Capacitor
+        run: |
+          RAW_ID="${{ github.event.inputs.app_id }}"
+          # 各セグメントを検証・修正: 英字始まり、英数字のみ
+          SAFE_ID=$(echo "$RAW_ID" | tr '_' '' | awk -F. '{
+            for(i=1;i<=NF;i++){
+              seg=$i
+              # 数字始まりなら先頭に"a"を付与
+              if(seg ~ /^[0-9]/) seg="a"seg
+              # 英数字以外を除去
+              gsub(/[^a-zA-Z0-9]/,"",seg)
+              if(seg=="") seg="app"
+              printf "%s%s", (i>1?".":""), seg
+            }
+            print ""
+          }')
+          echo "パッケージID: $RAW_ID -> $SAFE_ID"
+          node -e "
+            const cfg = {
+              appId: process.argv[1],
+              appName: process.argv[2],
+              webDir: 'www'
+            };
+            require('fs').writeFileSync('capacitor.config.json', JSON.stringify(cfg, null, 2));
+          " "$SAFE_ID" "${{ github.event.inputs.app_name }}"
+
+      - name: Install Capacitor
+        run: |
+          npm init -y
+          npm install @capacitor/core@6 @capacitor/cli@6 @capacitor/android@6
+
+      - name: Extract Web Assets (Local)
+        if: github.event.inputs.source_type == 'local'
+        run: |
+          rm -rf www www_temp
+          mkdir www
+          unzip -o www.zip -d www_temp
+          if [ -f "www_temp/index.html" ]; then
+            mv www_temp/* www/ 2>/dev/null || true
+          else
+            FOUND=$(find www_temp -name "index.html" -type f | head -1)
+            if [ -n "$FOUND" ]; then
+              TARGET_DIR=$(dirname "$FOUND")
+              cp -R "$TARGET_DIR/." www/
+            else
+              cp -R www_temp/* www/ 2>/dev/null || true
+            fi
+          fi
+          rm -rf www_temp
+
+      - name: Checkout Source Repo (GitHub)
+        if: github.event.inputs.source_type == 'github'
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.event.inputs.source_repo }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          path: source_repo_temp
+          fetch-depth: 1
+
+      - name: Copy Web Assets (GitHub)
+        if: github.event.inputs.source_type == 'github'
+        run: |
+          rm -rf www
+          mkdir www
+          SOURCE_PATH="${{ github.event.inputs.source_path }}"
+          SOURCE_PATH="${SOURCE_PATH#/}"
+          SOURCE_PATH="${SOURCE_PATH%/}"
+          SELECTED="${{ github.event.inputs.selected_files }}"
+          
+          if [ -n "$SELECTED" ]; then
+            IFS=',' read -ra ADDR <<< "$SELECTED"
+            for i in "${ADDR[@]}"; do
+              i="$(echo "$i" | xargs)"
+              if [ -z "$SOURCE_PATH" ]; then
+                DEST="$i"
+              else
+                DEST="${i#$SOURCE_PATH/}"
+              fi
+              mkdir -p "www/$(dirname "$DEST")" || true
+              if [ -d "source_repo_temp/$i" ]; then
+                cp -R "source_repo_temp/$i/." "www/$DEST/" 2>/dev/null || cp -R "source_repo_temp/$i" "www/$DEST" || true
+              else
+                cp "source_repo_temp/$i" "www/$DEST" || true
+              fi
+            done
+          else
+            if [ -z "$SOURCE_PATH" ]; then
+              shopt -s dotglob 2>/dev/null || true
+              for item in source_repo_temp/*; do
+                bname="$(basename "$item")"
+                [ "$bname" = ".git" ] && continue
+                [ "$bname" = ".github" ] && continue
+                [ "$bname" = "node_modules" ] && continue
+                cp -R "$item" "www/" || true
+              done
+            else
+              cp -R "source_repo_temp/$SOURCE_PATH/." www/ || true
+            fi
+          fi
+
+      - name: Verify Web Assets
+        run: |
+          if [ ! -f "www/index.html" ]; then
+            echo "::error::index.html not found in www/ directory!"
+            exit 1
+          fi
+
+      - name: Android Platform Setup
+        run: |
+          node -e "
+            const cfg = {
+              appId: process.argv[1],
+              appName: process.argv[2],
+              webDir: 'www'
+            };
+            require('fs').writeFileSync('capacitor.config.json', JSON.stringify(cfg, null, 2));
+            console.log('capacitor.config.json:', JSON.stringify(cfg, null, 2));
+          " "${{ github.event.inputs.app_id }}" "${{ github.event.inputs.app_name }}"
+          npx cap add android
+          npx cap sync android
+
+      - name: Set App Icon and PWA Manifest
+        if: github.event.inputs.app_icon_base64 != ''
+        run: |
+          mkdir -p temp_icon
+          ICON_B64="${{ github.event.inputs.app_icon_base64 }}"
+          if [ "$ICON_B64" = "__FROM_REPO__" ]; then
+            if [ -f "app-icon.png.b64" ]; then
+              base64 -d app-icon.png.b64 > temp_icon/icon.png
+            else
+              exit 0
+            fi
+          else
+            echo "$ICON_B64" | base64 -d > temp_icon/icon.png
+          fi
+          RES_DIR="android/app/src/main/res"
+          if [ -d "$RES_DIR" ]; then
+            # mipmap-anydpi-v26を削除してAdaptive Iconを無効化し、密度別PNGを使わせる
+            rm -rf "$RES_DIR/mipmap-anydpi-v26"
+            for dpi in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
+              mkdir -p "$RES_DIR/mipmap-$dpi"
+              cp temp_icon/icon.png "$RES_DIR/mipmap-$dpi/ic_launcher.png" || true
+              cp temp_icon/icon.png "$RES_DIR/mipmap-$dpi/ic_launcher_round.png" || true
+            done
+          fi
+          mkdir -p www/assets/icons
+          cp temp_icon/icon.png www/assets/icons/icon.png || true
+          printf '{"name":"%s","short_name":"%s","display":"standalone","icons":[{"src":"assets/icons/icon.png","sizes":"512x512","type":"image/png"}]}' "${{ github.event.inputs.app_name }}" "${{ github.event.inputs.app_name }}" > www/manifest.json
+
+      - name: Build APK
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ github.event.inputs.app_name }}-APK
+          path: android/app/build/outputs/apk/debug/app-debug.apk
