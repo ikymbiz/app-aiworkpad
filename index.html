@@ -9,9 +9,164 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="AIWorkPad">
     <meta name="theme-color" content="#ffffff">
-    <link rel="manifest" href='data:application/manifest+json;charset=utf-8,%7B%22name%22%3A%22AIWorkPad%22%2C%22short_name%22%3A%22AIWorkPad%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%23ffffff%22%2C%22theme_color%22%3A%22%23ffffff%22%7D'>
+    <link rel="manifest" href='data:application/manifest+json;charset=utf-8,%7B%22name%22%3A%22AIWorkPad%22%2C%22short_name%22%3A%22AIWorkPad%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%23ffffff%22%2C%22theme_color%22%3A%22%23ffffff%22%2C%22start_url%22%3A%22.%2F%22%7D'>
     
     <title>AIWorkPad</title>
+
+    <!-- ==========================================
+         Service Worker ソースコード (埋め込み)
+         ブラウザ仕様上 sw.js は別ファイルが必須。
+         初回起動時に自動ダウンロードを案内する。
+         ========================================== -->
+    <script id="sw-source" type="text/sw-template">
+// AIWorkPad Service Worker v3.0
+const CACHE_VERSION = 'aiworkpad-v3.0';
+const APP_SHELL_CACHE = CACHE_VERSION + '-shell';
+const CDN_CACHE = CACHE_VERSION + '-cdn';
+
+const APP_SHELL_URLS = ['./', './index.html'];
+
+const CDN_URLS = [
+    'https://cdn.tailwindcss.com?plugins=typography',
+    'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css',
+    'https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js',
+    'https://cdn.jsdelivr.net/npm/marked/marked.min.js',
+    'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js',
+];
+
+const FONT_PATTERN = /cdnjs\.cloudflare\.com\/ajax\/libs\/font-awesome/;
+const API_PATTERNS = [/generativelanguage\.googleapis\.com/, /api\.anthropic\.com/];
+
+// Install
+self.addEventListener('install', (event) => {
+    event.waitUntil(
+        Promise.all([
+            caches.open(APP_SHELL_CACHE).then(c => c.addAll(APP_SHELL_URLS).catch(() => {})),
+            caches.open(CDN_CACHE).then(c => Promise.allSettled(CDN_URLS.map(u => c.add(u).catch(() => {})))),
+        ]).then(() => self.skipWaiting())
+    );
+});
+
+// Activate
+self.addEventListener('activate', (event) => {
+    event.waitUntil(
+        caches.keys().then(keys =>
+            Promise.all(keys.filter(k => !k.startsWith(CACHE_VERSION)).map(k => caches.delete(k)))
+        ).then(() => self.clients.claim())
+    );
+});
+
+// Fetch
+self.addEventListener('fetch', (event) => {
+    const url = new URL(event.request.url);
+    if (API_PATTERNS.some(p => p.test(url.href))) { event.respondWith(fetch(event.request)); return; }
+    if (!url.protocol.startsWith('http')) return;
+
+    if (FONT_PATTERN.test(url.href) || CDN_URLS.some(u => url.href.startsWith(u))) {
+        event.respondWith(
+            caches.match(event.request).then(c => c || fetch(event.request).then(r => {
+                if (r && r.ok) { const cl = r.clone(); caches.open(CDN_CACHE).then(ca => ca.put(event.request, cl)); }
+                return r;
+            }).catch(() => new Response('', { headers: { 'Content-Type': 'text/css' } })))
+        );
+        return;
+    }
+
+    if (event.request.mode === 'navigate' || url.pathname.endsWith('.html') || url.pathname === '/' || url.pathname.endsWith('/')) {
+        event.respondWith(
+            fetch(event.request).then(r => {
+                if (r && r.ok) { const cl = r.clone(); caches.open(APP_SHELL_CACHE).then(c => c.put(event.request, cl)); }
+                return r;
+            }).catch(() => caches.match(event.request).then(c => c || caches.match('./index.html')))
+        );
+        return;
+    }
+
+    event.respondWith(
+        caches.match(event.request).then(c => c || fetch(event.request).then(r => {
+            if (r && r.ok) { const cl = r.clone(); caches.open(CDN_CACHE).then(ca => ca.put(event.request, cl)); }
+            return r;
+        }))
+    );
+});
+
+self.addEventListener('message', (e) => { if (e.data === 'skipWaiting') self.skipWaiting(); });
+    </script>
+
+    <!-- SW 登録 + 未配置時の自動生成 -->
+    <script>
+    (function() {
+        if (!('serviceWorker' in navigator)) return;
+
+        // sw.js の存在チェック → 登録
+        async function initSW() {
+            try {
+                const res = await fetch('./sw.js', { method: 'HEAD' });
+                if (res.ok) {
+                    const reg = await navigator.serviceWorker.register('./sw.js');
+                    console.log('[App] SW registered:', reg.scope);
+                    reg.addEventListener('updatefound', () => {
+                        const nw = reg.installing;
+                        nw.addEventListener('statechange', () => {
+                            if (nw.state === 'installed' && navigator.serviceWorker.controller) {
+                                if (confirm('AIWorkPadの新バージョンがあります。更新しますか？')) {
+                                    nw.postMessage('skipWaiting');
+                                    location.reload();
+                                }
+                            }
+                        });
+                    });
+                } else {
+                    offerSWDownload();
+                }
+            } catch (e) {
+                console.warn('[App] SW check failed:', e.message);
+                offerSWDownload();
+            }
+        }
+
+        // sw.js が存在しない場合 → 埋め込みコードからダウンロード生成
+        function offerSWDownload() {
+            const tmpl = document.getElementById('sw-source');
+            if (!tmpl) return;
+            const code = tmpl.textContent.trim();
+            const blob = new Blob([code], { type: 'application/javascript' });
+            const url = URL.createObjectURL(blob);
+
+            // 自動ダウンロード案内バナーを表示
+            const banner = document.createElement('div');
+            banner.id = 'sw-install-banner';
+            banner.style.cssText = 'position:fixed;bottom:0;left:0;right:0;z-index:9999;background:#1e40af;color:#fff;padding:12px 16px;display:flex;align-items:center;gap:12px;justify-content:center;font-size:14px;box-shadow:0 -2px 8px rgba(0,0,0,0.2);';
+            banner.innerHTML = `
+                <i class="fa-solid fa-download" style="font-size:18px;"></i>
+                <span>オフライン対応には <b>sw.js</b> が必要です</span>
+                <a id="sw-download-link" href="${url}" download="sw.js"
+                   style="background:#fff;color:#1e40af;padding:6px 16px;border-radius:6px;font-weight:bold;text-decoration:none;">
+                   sw.js をダウンロード
+                </a>
+                <button onclick="this.parentElement.remove()"
+                   style="background:transparent;border:none;color:#93c5fd;cursor:pointer;font-size:18px;margin-left:8px;">✕</button>
+            `;
+            document.body.appendChild(banner);
+
+            // ダウンロードクリック後にリロード案内
+            banner.querySelector('#sw-download-link').addEventListener('click', () => {
+                setTimeout(() => {
+                    banner.innerHTML = `
+                        <i class="fa-solid fa-check-circle" style="font-size:18px;color:#86efac;"></i>
+                        <span>sw.js を index.html と<b>同じフォルダ</b>に配置後、ページを再読み込みしてください</span>
+                        <button onclick="location.reload()"
+                           style="background:#fff;color:#1e40af;padding:6px 16px;border-radius:6px;font-weight:bold;border:none;cursor:pointer;">
+                           再読み込み
+                        </button>
+                    `;
+                }, 500);
+            });
+        }
+
+        window.addEventListener('load', initSW);
+    })();
+    </script>
     <!-- Tailwind CSS with Typography Plugin -->
     <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
     <!-- FontAwesome -->
@@ -20,6 +175,8 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js"></script>
     <!-- Marked.js (Markdown Parser) -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <!-- JSZip (Bulk Export) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     
     <script>
         tailwind.config = {
@@ -141,6 +298,77 @@
             outline: 1.5px dashed #3b82f6;
             outline-offset: -1.5px;
         }
+
+        /* クイックスイッチャー & 検索モーダル */
+        .modal-overlay {
+            backdrop-filter: blur(4px);
+        }
+        .quick-switcher-input {
+            font-size: 18px;
+        }
+        .search-result-item {
+            transition: background 0.15s;
+        }
+        .search-result-item:hover, .search-result-item.active {
+            background: #e2e8f0;
+        }
+        .search-result-item .highlight {
+            background: #fef08a;
+            border-radius: 2px;
+            padding: 0 1px;
+        }
+
+        /* ワードカウントバー */
+        #word-count-bar {
+            font-size: 10px;
+            line-height: 1;
+        }
+
+        /* タグ */
+        .tag-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 2px;
+            padding: 1px 6px;
+            border-radius: 9999px;
+            font-size: 10px;
+            font-weight: 500;
+            background: #e0e7ff;
+            color: #4f46e5;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+        .tag-badge:hover { background: #c7d2fe; }
+
+        /* バックリンク */
+        .backlink-item {
+            padding: 4px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+        .backlink-item:hover { background: #e2e8f0; }
+
+        /* ブックマークアイコン */
+        .bookmark-star {
+            color: #cbd5e1;
+            cursor: pointer;
+            transition: color 0.15s;
+        }
+        .bookmark-star.active { color: #f59e0b; }
+        .bookmark-star:hover { color: #f59e0b; }
+
+        /* 検索＆置換バー */
+        #find-replace-bar {
+            transition: max-height 0.2s ease, opacity 0.2s ease;
+            overflow: hidden;
+        }
+
+        /* テンプレート挿入メニュー */
+        .template-item {
+            transition: background 0.15s;
+        }
+        .template-item:hover { background: #e2e8f0; }
     </style>
 </head>
 <body class="bg-light text-slate-800 flex flex-col font-sans">
@@ -159,6 +387,15 @@
             </div>
         </div>
         <div class="flex items-center gap-1 sm:gap-3">
+            <button id="btn-global-search" class="text-slate-500 hover:text-primary transition p-2 rounded-full hover:bg-slate-100" title="全文検索 (Ctrl+Shift+F)">
+                <i class="fa-solid fa-magnifying-glass"></i>
+            </button>
+            <button id="btn-quick-switch" class="text-slate-500 hover:text-primary transition p-2 rounded-full hover:bg-slate-100" title="クイックスイッチャー (Ctrl+O)">
+                <i class="fa-solid fa-bolt"></i>
+            </button>
+            <button id="btn-export-menu" class="text-slate-500 hover:text-primary transition p-2 rounded-full hover:bg-slate-100" title="エクスポート・共有">
+                <i class="fa-solid fa-share-from-square"></i>
+            </button>
             <button id="btn-manual-save" class="text-slate-500 hover:text-primary transition p-2 rounded-full hover:bg-slate-100" title="手動保存">
                 <i class="fa-solid fa-save"></i>
             </button>
@@ -223,14 +460,30 @@
                 
                 <div class="flex-1 min-w-[2px]"></div>
                 
-                <button id="btn-toggle-preview" class="text-slate-500 hover:text-primary hover:bg-primary/10 p-1 sm:p-1.5 md:p-2 rounded transition flex items-center justify-center flex-shrink-0 shadow-sm border border-slate-200 bg-white" title="プレビュー">
+                <button id="btn-insert-template" class="text-slate-500 hover:text-primary hover:bg-primary/10 p-1 sm:p-1.5 md:p-2 rounded transition flex items-center justify-center flex-shrink-0 shadow-sm border border-slate-200 bg-white" title="テンプレート (Ctrl+T)">
+                    <i class="fa-solid fa-stamp"></i>
+                </button>
+                <button id="btn-toggle-preview" class="text-slate-500 hover:text-primary hover:bg-primary/10 p-1 sm:p-1.5 md:p-2 rounded transition flex items-center justify-center flex-shrink-0 shadow-sm border border-slate-200 bg-white" title="プレビュー (Ctrl+E)">
                     <i class="fa-solid fa-eye"></i> 
                 </button>
             </div>
 
+            <!-- 検索＆置換バー -->
+            <div id="find-replace-bar" class="shrink-0 hidden px-2 sm:px-4 md:px-8 py-1.5 bg-amber-50/80 border-b border-amber-200 flex items-center gap-2 text-xs">
+                <i class="fa-solid fa-search text-amber-500"></i>
+                <input type="text" id="find-input" class="flex-1 bg-white border border-slate-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-amber-400" placeholder="検索...">
+                <input type="text" id="replace-input" class="flex-1 bg-white border border-slate-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-amber-400" placeholder="置換...">
+                <span id="find-count" class="text-slate-500 whitespace-nowrap">0件</span>
+                <button id="btn-find-prev" class="p-1 hover:bg-amber-200 rounded" title="前へ"><i class="fa-solid fa-chevron-up"></i></button>
+                <button id="btn-find-next" class="p-1 hover:bg-amber-200 rounded" title="次へ"><i class="fa-solid fa-chevron-down"></i></button>
+                <button id="btn-replace-one" class="px-2 py-1 bg-amber-200 hover:bg-amber-300 rounded" title="置換">置換</button>
+                <button id="btn-replace-all" class="px-2 py-1 bg-amber-200 hover:bg-amber-300 rounded" title="全置換">全置換</button>
+                <button id="btn-close-find" class="p-1 hover:bg-amber-200 rounded"><i class="fa-solid fa-times"></i></button>
+            </div>
+
             <!-- エディタ & プレビュー コンテナ -->
             <div class="flex-1 relative overflow-hidden bg-white">
-                <textarea id="editor" class="absolute inset-0 w-full h-full p-4 md:p-8 bg-transparent custom-scrollbar resize-none focus:outline-none" placeholder="Write here... &#10;テキストを選択するとAIメニューが表示されます。"></textarea>
+                <textarea id="editor" class="absolute inset-0 w-full h-full p-4 md:p-8 bg-transparent custom-scrollbar resize-none focus:outline-none" placeholder="Write here... &#10;テキストを選択するとAIメニューが表示されます。&#10;[[ドキュメント名]] でリンク作成、#タグ でタグ付け"></textarea>
                 <div id="editor-preview" class="hidden absolute inset-0 p-4 md:p-8 overflow-y-auto custom-scrollbar prose prose-sm md:prose-base prose-slate max-w-none bg-white z-10 pb-20"></div>
 
                 <!-- AIアクションシート (横スクロール対応) -->
@@ -262,6 +515,21 @@
                     </div>
                 </div>
             </div>
+
+            <!-- ワードカウント・ステータスバー -->
+            <div id="word-count-bar" class="shrink-0 px-4 md:px-8 py-1 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-slate-400 gap-3">
+                <div class="flex items-center gap-3">
+                    <span id="stat-chars">0文字</span>
+                    <span id="stat-words">0単語</span>
+                    <span id="stat-lines">0行</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span id="stat-tags" class="cursor-pointer hover:text-primary" title="タグ一覧"></span>
+                    <button id="btn-bookmark-toggle" class="bookmark-star" title="ブックマーク">
+                        <i class="fa-solid fa-star"></i>
+                    </button>
+                </div>
+            </div>
         </main>
 
         <!-- モバイル用 右サイドパネルオーバーレイ -->
@@ -281,6 +549,9 @@
                 </button>
                 <button class="tab-btn flex flex-col items-center justify-center min-w-[60px] flex-1 py-2 text-[10px] sm:text-xs font-medium text-slate-500 hover:text-slate-700 gap-1" data-target="tab-history">
                     <i class="fa-solid fa-clock-rotate-left text-sm"></i>履歴
+                </button>
+                <button class="tab-btn flex flex-col items-center justify-center min-w-[60px] flex-1 py-2 text-[10px] sm:text-xs font-medium text-slate-500 hover:text-slate-700 gap-1" data-target="tab-backlinks">
+                    <i class="fa-solid fa-link text-sm"></i>リンク
                 </button>
             </div>
 
@@ -362,6 +633,16 @@
                     <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">バージョン履歴</h3>
                     <div id="history-list" class="space-y-2"></div>
                 </div>
+
+                <!-- バックリンクタブ -->
+                <div id="tab-backlinks" class="tab-content hidden flex-col">
+                    <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">バックリンク</h3>
+                    <p class="text-[10px] text-slate-400 mb-2">このドキュメントを [[参照]] しているドキュメント</p>
+                    <div id="backlink-list" class="space-y-1"></div>
+                    <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mt-4 mb-3">アウトゴーイングリンク</h3>
+                    <p class="text-[10px] text-slate-400 mb-2">このドキュメントから参照しているリンク</p>
+                    <div id="outgoing-link-list" class="space-y-1"></div>
+                </div>
             </div>
             
             <button id="btn-close-sidebar-mobile" class="md:hidden p-4 bg-slate-200 text-center font-bold text-slate-600 shrink-0 border-t border-slate-300 z-20">
@@ -402,10 +683,14 @@
                 <!-- APIキー設定 -->
                 <div>
                     <h4 class="text-sm font-bold text-slate-700 mb-2 border-b pb-1">APIキー管理</h4>
-                    <label class="block text-xs font-medium text-slate-600 mb-1">Gemini APIキー</label>
+                    <div class="flex items-center gap-1 mb-2 text-[10px] text-green-600 bg-green-50 px-2 py-1 rounded">
+                        <i class="fa-solid fa-shield-halved"></i>
+                        <span>AES-GCM 256bit 暗号化で保存されます</span>
+                    </div>
+                    <label class="block text-xs font-medium text-slate-600 mb-1"><i class="fa-solid fa-lock text-green-500 mr-1"></i>Gemini APIキー</label>
                     <input type="password" id="input-api-key" class="w-full p-2 mb-3 border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-primary text-sm" placeholder="AIzaSy...">
                     
-                    <label class="block text-xs font-medium text-slate-600 mb-1">Claude APIキー (オプション)</label>
+                    <label class="block text-xs font-medium text-slate-600 mb-1"><i class="fa-solid fa-lock text-green-500 mr-1"></i>Claude APIキー (オプション)</label>
                     <input type="password" id="input-claude-key" class="w-full p-2 border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-primary text-sm" placeholder="sk-ant-...">
                 </div>
 
@@ -442,6 +727,94 @@
             </div>
         </div>
     </div>
+
+    <!-- 全文検索モーダル -->
+    <div id="search-modal" class="fixed inset-0 bg-black/40 modal-overlay z-50 hidden flex items-start justify-center pt-[15vh] p-4">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[60vh]">
+            <div class="p-3 border-b border-slate-100 flex items-center gap-2 bg-slate-50 shrink-0">
+                <i class="fa-solid fa-magnifying-glass text-primary"></i>
+                <input type="text" id="global-search-input" class="flex-1 bg-transparent text-sm focus:outline-none" placeholder="全てのドキュメントを検索..." autofocus>
+                <kbd class="text-[10px] bg-slate-200 px-1.5 py-0.5 rounded text-slate-500">ESC</kbd>
+            </div>
+            <div id="search-results" class="flex-1 overflow-y-auto p-2 custom-scrollbar">
+                <p class="text-xs text-slate-400 text-center py-4">キーワードを入力してください</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- クイックスイッチャーモーダル -->
+    <div id="quick-switch-modal" class="fixed inset-0 bg-black/40 modal-overlay z-50 hidden flex items-start justify-center pt-[15vh] p-4">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[60vh]">
+            <div class="p-3 border-b border-slate-100 flex items-center gap-2 bg-slate-50 shrink-0">
+                <i class="fa-solid fa-bolt text-amber-500"></i>
+                <input type="text" id="quick-switch-input" class="flex-1 bg-transparent quick-switcher-input focus:outline-none" placeholder="ドキュメント名を入力..." autofocus>
+                <kbd class="text-[10px] bg-slate-200 px-1.5 py-0.5 rounded text-slate-500">ESC</kbd>
+            </div>
+            <div id="quick-switch-results" class="flex-1 overflow-y-auto p-2 custom-scrollbar">
+            </div>
+        </div>
+    </div>
+
+    <!-- エクスポート・共有モーダル -->
+    <div id="export-modal" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden flex flex-col">
+            <div class="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
+                <h3 class="font-bold text-slate-700"><i class="fa-solid fa-share-from-square text-primary mr-2"></i>エクスポート・共有</h3>
+                <button id="btn-close-export" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-times text-lg"></i></button>
+            </div>
+            <div class="p-4 space-y-2">
+                <p class="text-xs text-slate-500 font-bold mb-2">現在のドキュメント</p>
+                <button id="btn-export-md" class="w-full text-left p-3 bg-slate-50 hover:bg-slate-100 rounded-lg transition flex items-center gap-3">
+                    <i class="fa-solid fa-file-arrow-down text-primary text-lg w-6 text-center"></i>
+                    <div><div class="text-sm font-medium text-slate-700">Markdownダウンロード</div><div class="text-[10px] text-slate-400">.mdファイルとして保存</div></div>
+                </button>
+                <button id="btn-export-txt" class="w-full text-left p-3 bg-slate-50 hover:bg-slate-100 rounded-lg transition flex items-center gap-3">
+                    <i class="fa-solid fa-file-lines text-green-500 text-lg w-6 text-center"></i>
+                    <div><div class="text-sm font-medium text-slate-700">テキストダウンロード</div><div class="text-[10px] text-slate-400">.txtファイルとして保存</div></div>
+                </button>
+                <button id="btn-share-native" class="w-full text-left p-3 bg-slate-50 hover:bg-slate-100 rounded-lg transition flex items-center gap-3">
+                    <i class="fa-solid fa-share-nodes text-indigo-500 text-lg w-6 text-center"></i>
+                    <div><div class="text-sm font-medium text-slate-700">他のアプリに共有</div><div class="text-[10px] text-slate-400">LINE, メール, メモ等に送信</div></div>
+                </button>
+                <button id="btn-copy-clipboard" class="w-full text-left p-3 bg-slate-50 hover:bg-slate-100 rounded-lg transition flex items-center gap-3">
+                    <i class="fa-solid fa-clipboard text-amber-500 text-lg w-6 text-center"></i>
+                    <div><div class="text-sm font-medium text-slate-700">クリップボードにコピー</div><div class="text-[10px] text-slate-400">内容をコピー</div></div>
+                </button>
+                <div class="border-t border-slate-200 mt-3 pt-3">
+                    <p class="text-xs text-slate-500 font-bold mb-2">全ドキュメント</p>
+                    <button id="btn-export-all-zip" class="w-full text-left p-3 bg-slate-50 hover:bg-slate-100 rounded-lg transition flex items-center gap-3">
+                        <i class="fa-solid fa-file-zipper text-red-500 text-lg w-6 text-center"></i>
+                        <div><div class="text-sm font-medium text-slate-700">全データZIPエクスポート</div><div class="text-[10px] text-slate-400">フォルダ構造を維持してエクスポート</div></div>
+                    </button>
+                    <button id="btn-export-json" class="w-full text-left p-3 bg-slate-50 hover:bg-slate-100 rounded-lg transition flex items-center gap-3 mt-2">
+                        <i class="fa-solid fa-database text-cyan-500 text-lg w-6 text-center"></i>
+                        <div><div class="text-sm font-medium text-slate-700">JSONバックアップ</div><div class="text-[10px] text-slate-400">設定・チャット含む完全バックアップ</div></div>
+                    </button>
+                    <button id="btn-import-json" class="w-full text-left p-3 bg-slate-50 hover:bg-slate-100 rounded-lg transition flex items-center gap-3 mt-2">
+                        <i class="fa-solid fa-file-import text-emerald-500 text-lg w-6 text-center"></i>
+                        <div><div class="text-sm font-medium text-slate-700">JSONインポート</div><div class="text-[10px] text-slate-400">バックアップからデータを復元</div></div>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- テンプレートモーダル -->
+    <div id="template-modal" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden flex flex-col max-h-[70vh]">
+            <div class="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
+                <h3 class="font-bold text-slate-700"><i class="fa-solid fa-stamp text-primary mr-2"></i>テンプレート挿入</h3>
+                <button id="btn-close-template" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-times text-lg"></i></button>
+            </div>
+            <div id="template-list" class="flex-1 overflow-y-auto p-3 space-y-2 custom-scrollbar"></div>
+            <div class="p-3 border-t border-slate-100 bg-slate-50 shrink-0">
+                <button id="btn-manage-templates" class="w-full text-center text-xs text-primary hover:underline">テンプレートを管理 (設定から)</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 隠しファイル入力 (JSONインポート用) -->
+    <input type="file" id="import-file-input" accept=".json" class="hidden">
 
     <!-- トースト通知コンテナ (下部中央配置) -->
     <div id="toast-container" class="fixed bottom-4 left-1/2 transform -translate-x-1/2 z-[60] flex flex-col gap-2 pointer-events-none items-center w-full px-4"></div>
@@ -481,6 +854,124 @@
         const dbHistory = localforage.createInstance({ name: "AIWorkPad", storeName: "history" });
         const dbChat = localforage.createInstance({ name: "AIWorkPad", storeName: "chat" });
         const dbSettings = localforage.createInstance({ name: "AIWorkPad", storeName: "settings" });
+        const dbBookmarks = localforage.createInstance({ name: "AIWorkPad", storeName: "bookmarks" });
+        const dbTemplates = localforage.createInstance({ name: "AIWorkPad", storeName: "templates" });
+
+        // ==========================================
+        // 暗号化モジュール (Web Crypto API — AES-GCM 256bit)
+        // ==========================================
+        const CryptoModule = (() => {
+            const SALT_KEY = 'crypto_salt';
+            const PBKDF2_ITERATIONS = 100000;
+
+            // デバイス固有のフィンガープリントを生成
+            function getDeviceFingerprint() {
+                const parts = [
+                    navigator.userAgent,
+                    screen.width + 'x' + screen.height,
+                    screen.colorDepth,
+                    new Date().getTimezoneOffset(),
+                    navigator.language,
+                    navigator.hardwareConcurrency || 'unknown',
+                ];
+                return parts.join('|');
+            }
+
+            // ソルトを取得または生成
+            async function getSalt() {
+                let salt = await dbSettings.getItem(SALT_KEY);
+                if (!salt) {
+                    salt = Array.from(crypto.getRandomValues(new Uint8Array(16)));
+                    await dbSettings.setItem(SALT_KEY, salt);
+                }
+                return new Uint8Array(salt);
+            }
+
+            // PBKDF2 で CryptoKey を導出
+            async function deriveKey(salt) {
+                const fingerprint = getDeviceFingerprint();
+                const encoder = new TextEncoder();
+                const keyMaterial = await crypto.subtle.importKey(
+                    'raw', encoder.encode(fingerprint), 'PBKDF2', false, ['deriveKey']
+                );
+                return crypto.subtle.deriveKey(
+                    { name: 'PBKDF2', salt, iterations: PBKDF2_ITERATIONS, hash: 'SHA-256' },
+                    keyMaterial,
+                    { name: 'AES-GCM', length: 256 },
+                    false,
+                    ['encrypt', 'decrypt']
+                );
+            }
+
+            // 暗号化: 平文 → Base64(IV + 暗号文)
+            async function encrypt(plainText) {
+                if (!plainText) return '';
+                try {
+                    const salt = await getSalt();
+                    const key = await deriveKey(salt);
+                    const iv = crypto.getRandomValues(new Uint8Array(12));
+                    const encoder = new TextEncoder();
+                    const encrypted = await crypto.subtle.encrypt(
+                        { name: 'AES-GCM', iv },
+                        key,
+                        encoder.encode(plainText)
+                    );
+                    // IV (12 bytes) + 暗号文 を結合して Base64
+                    const combined = new Uint8Array(iv.length + encrypted.byteLength);
+                    combined.set(iv, 0);
+                    combined.set(new Uint8Array(encrypted), iv.length);
+                    return btoa(String.fromCharCode(...combined));
+                } catch (e) {
+                    console.error('[Crypto] Encrypt error:', e);
+                    return '';
+                }
+            }
+
+            // 復号: Base64(IV + 暗号文) → 平文
+            async function decrypt(encryptedBase64) {
+                if (!encryptedBase64) return '';
+                try {
+                    const salt = await getSalt();
+                    const key = await deriveKey(salt);
+                    const combined = Uint8Array.from(atob(encryptedBase64), c => c.charCodeAt(0));
+                    const iv = combined.slice(0, 12);
+                    const ciphertext = combined.slice(12);
+                    const decrypted = await crypto.subtle.decrypt(
+                        { name: 'AES-GCM', iv },
+                        key,
+                        ciphertext
+                    );
+                    return new TextDecoder().decode(decrypted);
+                } catch (e) {
+                    console.error('[Crypto] Decrypt error:', e);
+                    return '';
+                }
+            }
+
+            // 値が暗号化済みかどうかを判定 (Base64で長い文字列 = 暗号化済み)
+            function isEncrypted(value) {
+                if (!value) return false;
+                // 平文APIキーは AIzaSy... や sk-ant-... 形式
+                // 暗号化済みは Base64 (英数字+/+=のみ)
+                if (value.startsWith('AIza') || value.startsWith('sk-')) return false;
+                try {
+                    atob(value);
+                    return value.length > 30; // 短い Base64 は除外
+                } catch {
+                    return false;
+                }
+            }
+
+            return { encrypt, decrypt, isEncrypted };
+        })();
+
+        // 組み込みテンプレート
+        const BUILTIN_TEMPLATES = [
+            { id: 'tpl_meeting', name: '議事録', content: '## 議事録\n\n**日時**: {{date}}\n**参加者**: \n**議題**: \n\n### アジェンダ\n1. \n\n### 決定事項\n- \n\n### アクションアイテム\n- [ ] \n' },
+            { id: 'tpl_daily', name: 'デイリーノート', content: '## {{date}} のノート\n\n### 今日のタスク\n- [ ] \n\n### メモ\n\n\n### 振り返り\n\n' },
+            { id: 'tpl_article', name: '記事テンプレート', content: '## タイトル\n\n### はじめに\n\n\n### 本文\n\n\n### まとめ\n\n\n---\n*タグ: #記事*\n' },
+            { id: 'tpl_todo', name: 'TODOリスト', content: '## TODO\n\n### 優先度高\n- [ ] \n\n### 優先度中\n- [ ] \n\n### 優先度低\n- [ ] \n' },
+        ];
 
         // DOM Elements
         const docTitleInput = document.getElementById('doc-title-input');
@@ -625,13 +1116,30 @@
         // ==========================================
         async function loadSettings() {
             const saved = await dbSettings.getItem('appSettings');
-            if (saved) appSettings = { ...appSettings, ...saved };
+            if (saved) {
+                appSettings = { ...appSettings, ...saved };
+                // 既存の平文キーを暗号化に移行
+                let needsSave = false;
+                if (appSettings.geminiKey && !CryptoModule.isEncrypted(appSettings.geminiKey)) {
+                    appSettings.geminiKey = await CryptoModule.encrypt(appSettings.geminiKey);
+                    needsSave = true;
+                }
+                if (appSettings.claudeKey && !CryptoModule.isEncrypted(appSettings.claudeKey)) {
+                    appSettings.claudeKey = await CryptoModule.encrypt(appSettings.claudeKey);
+                    needsSave = true;
+                }
+                if (needsSave) {
+                    await dbSettings.setItem('appSettings', appSettings);
+                    console.log('[Crypto] Migrated plaintext API keys to encrypted storage');
+                }
+            }
             updatePersonaSelects();
         }
 
         async function init() {
             await loadSettings();
             setupEventListeners();
+            setupKeyboardShortcuts();
             await loadDocumentList();
             
             setInterval(() => {
@@ -708,6 +1216,7 @@
                 btn.addEventListener('click', (e) => applyMarkdownFormat(e.currentTarget.dataset.md));
             });
             btnTogglePreview.addEventListener('click', togglePreviewMode);
+            document.getElementById('btn-insert-template').addEventListener('click', showTemplateModal);
             document.addEventListener('selectionchange', handleSelection);
             
             // AIアクションシート
@@ -775,9 +1284,12 @@
             });
 
             // 設定モーダル
-            document.getElementById('btn-settings').addEventListener('click', () => {
-                document.getElementById('input-api-key').value = appSettings.geminiKey;
-                document.getElementById('input-claude-key').value = appSettings.claudeKey;
+            document.getElementById('btn-settings').addEventListener('click', async () => {
+                // 暗号化されたキーを復号して表示
+                const geminiPlain = await CryptoModule.decrypt(appSettings.geminiKey);
+                const claudePlain = await CryptoModule.decrypt(appSettings.claudeKey);
+                document.getElementById('input-api-key').value = geminiPlain;
+                document.getElementById('input-claude-key').value = claudePlain;
                 document.querySelector(`input[name="defaultModel"][value="${appSettings.defaultModel}"]`).checked = true;
                 document.getElementById('pref-notify-ai').checked = appSettings.notifyAI;
                 document.getElementById('pref-notify-save').checked = appSettings.notifySave;
@@ -799,8 +1311,11 @@
             });
 
             document.getElementById('btn-save-settings').addEventListener('click', async () => {
-                appSettings.geminiKey = document.getElementById('input-api-key').value.trim();
-                appSettings.claudeKey = document.getElementById('input-claude-key').value.trim();
+                const geminiPlain = document.getElementById('input-api-key').value.trim();
+                const claudePlain = document.getElementById('input-claude-key').value.trim();
+                // APIキーを暗号化して保存
+                appSettings.geminiKey = await CryptoModule.encrypt(geminiPlain);
+                appSettings.claudeKey = await CryptoModule.encrypt(claudePlain);
                 appSettings.defaultModel = document.querySelector('input[name="defaultModel"]:checked').value;
                 appSettings.notifyAI = document.getElementById('pref-notify-ai').checked;
                 appSettings.notifySave = document.getElementById('pref-notify-save').checked;
@@ -808,7 +1323,7 @@
                 await dbSettings.setItem('appSettings', appSettings);
                 updatePersonaSelects();
                 document.getElementById('settings-modal').classList.add('hidden');
-                showToast('設定を保存しました', 'save');
+                showToast('設定を保存しました (キー暗号化済)', 'save');
             });
 
             // リサーチモーダル
@@ -841,6 +1356,69 @@
             document.getElementById('btn-clear-draft').addEventListener('click', () => {
                 draftContentCache = ""; document.getElementById('draft-preview').innerHTML = '生成された記事がここに表示されます。';
             });
+
+            // 全文検索
+            document.getElementById('btn-global-search').addEventListener('click', () => {
+                document.getElementById('search-modal').classList.remove('hidden');
+                const input = document.getElementById('global-search-input');
+                input.value = ''; input.focus();
+            });
+            let searchTimer;
+            document.getElementById('global-search-input').addEventListener('input', (e) => {
+                clearTimeout(searchTimer);
+                searchTimer = setTimeout(() => performGlobalSearch(e.target.value), 300);
+            });
+            document.getElementById('search-modal').addEventListener('click', (e) => {
+                if (e.target === e.currentTarget) e.currentTarget.classList.add('hidden');
+            });
+
+            // クイックスイッチャー
+            document.getElementById('btn-quick-switch').addEventListener('click', () => {
+                document.getElementById('quick-switch-modal').classList.remove('hidden');
+                const input = document.getElementById('quick-switch-input');
+                input.value = ''; input.focus();
+                performQuickSwitch('');
+            });
+            document.getElementById('quick-switch-input').addEventListener('input', (e) => {
+                performQuickSwitch(e.target.value);
+            });
+            document.getElementById('quick-switch-modal').addEventListener('click', (e) => {
+                if (e.target === e.currentTarget) e.currentTarget.classList.add('hidden');
+            });
+
+            // エクスポート・共有
+            document.getElementById('btn-export-menu').addEventListener('click', () => {
+                document.getElementById('export-modal').classList.remove('hidden');
+            });
+            document.getElementById('btn-close-export').addEventListener('click', () => document.getElementById('export-modal').classList.add('hidden'));
+            document.getElementById('btn-export-md').addEventListener('click', () => { exportCurrentMD(); document.getElementById('export-modal').classList.add('hidden'); });
+            document.getElementById('btn-export-txt').addEventListener('click', () => { exportCurrentTXT(); document.getElementById('export-modal').classList.add('hidden'); });
+            document.getElementById('btn-share-native').addEventListener('click', () => { shareNative(); document.getElementById('export-modal').classList.add('hidden'); });
+            document.getElementById('btn-copy-clipboard').addEventListener('click', () => { copyToClipboard(); document.getElementById('export-modal').classList.add('hidden'); });
+            document.getElementById('btn-export-all-zip').addEventListener('click', () => { exportAllZip(); document.getElementById('export-modal').classList.add('hidden'); });
+            document.getElementById('btn-export-json').addEventListener('click', () => { exportJSON(); document.getElementById('export-modal').classList.add('hidden'); });
+            document.getElementById('btn-import-json').addEventListener('click', () => { document.getElementById('import-file-input').click(); document.getElementById('export-modal').classList.add('hidden'); });
+            document.getElementById('import-file-input').addEventListener('change', (e) => {
+                if (e.target.files[0]) importJSON(e.target.files[0]);
+                e.target.value = '';
+            });
+
+            // 検索＆置換
+            document.getElementById('find-input').addEventListener('input', findInEditor);
+            document.getElementById('btn-find-next').addEventListener('click', findNext);
+            document.getElementById('btn-find-prev').addEventListener('click', findPrev);
+            document.getElementById('btn-replace-one').addEventListener('click', replaceOne);
+            document.getElementById('btn-replace-all').addEventListener('click', replaceAll);
+            document.getElementById('btn-close-find').addEventListener('click', hideFindReplace);
+
+            // ブックマーク
+            document.getElementById('btn-bookmark-toggle').addEventListener('click', toggleBookmark);
+
+            // テンプレート
+            document.getElementById('btn-close-template').addEventListener('click', () => document.getElementById('template-modal').classList.add('hidden'));
+
+            // ワードカウント更新
+            editor.addEventListener('input', updateWordCount);
         }
 
         // ==========================================
@@ -858,7 +1436,29 @@
                 btnTogglePreview.innerHTML = '<i class="fa-solid fa-pen"></i>';
                 btnTogglePreview.classList.add('bg-primary/10', 'text-primary');
                 const titleMarkdown = docTitleInput.value.trim() ? `# ${docTitleInput.value.trim()}\n\n` : '';
-                editorPreview.innerHTML = marked.parse(titleMarkdown + (editor.value || '*何も書かれていません*'));
+                let rawContent = editor.value || '*何も書かれていません*';
+                // [[wikilinks]] をリンクに変換
+                rawContent = rawContent.replace(/\[\[([^\]]+)\]\]/g, '<a class="text-primary font-medium cursor-pointer wikilink" data-title="$1">📎 $1</a>');
+                // #tags をバッジに変換
+                rawContent = rawContent.replace(/(?:^|\s)(#[a-zA-Z\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF\w]+)/g, ' <span class="tag-badge">$1</span>');
+                editorPreview.innerHTML = marked.parse(titleMarkdown + rawContent);
+                // wikilink クリックイベント
+                editorPreview.querySelectorAll('.wikilink').forEach(el => {
+                    el.addEventListener('click', async () => {
+                        const targetTitle = el.dataset.title;
+                        const list = await dbDocList.getItem('list') || [];
+                        const target = list.find(d => d.title === targetTitle);
+                        if (target) {
+                            await saveDocument();
+                            currentDocId = target.id;
+                            renderDocList(list);
+                            await loadDocument();
+                            togglePreviewMode();
+                        } else {
+                            showToast(`"${targetTitle}" は見つかりません`, 'warning');
+                        }
+                    });
+                });
                 hideActionSheet();
             }
         }
@@ -964,14 +1564,23 @@
         // ==========================================
         // AI 処理群 (Action, Chat, Draft)
         // ==========================================
-        function getAPIKey(model) {
-            const key = model === 'claude' ? appSettings.claudeKey : appSettings.geminiKey;
-            if (!key) {
+        async function getAPIKey(model) {
+            const encryptedKey = model === 'claude' ? appSettings.claudeKey : appSettings.geminiKey;
+            if (!encryptedKey) {
                 showToast(`${model}のAPIキーが設定されていません`, 'error');
                 document.getElementById('btn-settings').click();
                 return null;
             }
-            return key;
+            // 暗号化済みなら復号、そうでなければそのまま返す
+            if (CryptoModule.isEncrypted(encryptedKey)) {
+                const plain = await CryptoModule.decrypt(encryptedKey);
+                if (!plain) {
+                    showToast(`${model}のAPIキーの復号に失敗しました。再設定してください`, 'error');
+                    return null;
+                }
+                return plain;
+            }
+            return encryptedKey;
         }
 
         function getPersonaPrompt(id) {
@@ -981,7 +1590,7 @@
 
         async function executeAITask(prompt, actionName, mode, model = null, sysPrompt = null) {
             const aiModel = model || appSettings.defaultModel;
-            const apiKey = getAPIKey(aiModel);
+            const apiKey = await getAPIKey(aiModel);
             if (!apiKey) return;
 
             const systemPrompt = sysPrompt || getPersonaPrompt('default');
@@ -1053,7 +1662,7 @@
             const prompt = `以下の文章と調査方針に基づいて、深掘り調査を行い、詳細なレポート（マークダウン形式）を作成してください。\n\n【対象文章】\n${selectionRange.text}\n\n【調査方針】\n${instruction || '深く掘り下げて解説して'}`;
             
             const aiModel = appSettings.defaultModel;
-            const apiKey = getAPIKey(aiModel); if(!apiKey) return;
+            const apiKey = await getAPIKey(aiModel); if(!apiKey) return;
             setAIProcessingState(true); await requestWakeLock(); showToast(`深掘り調査を実行中...`, 'info');
             try {
                 const data = await runAIWorker({ aiModel, apiKey, prompt, systemPrompt: getPersonaPrompt('default'), actionName: '深掘り調査', mode: 'research' });
@@ -1416,6 +2025,7 @@
             editor.value = doc ? doc.content : ''; currentContent = editor.value;
             updateSaveStatus("保存済", "text-slate-400", "fa-cloud-check");
             updateTOC(); await loadHistory(); await loadChatHistory();
+            updateWordCount(); await updateBookmarkUI(); await updateBacklinks();
         }
 
         async function saveDocument() {
@@ -1470,6 +2080,531 @@
                     }
                 });
                 historyList.appendChild(div);
+            });
+        }
+
+        // ==========================================
+        // ワードカウント
+        // ==========================================
+        function updateWordCount() {
+            const text = editor.value;
+            const chars = text.length;
+            const words = text.trim() ? text.trim().split(/\s+/).length : 0;
+            const lines = text ? text.split('\n').length : 0;
+            document.getElementById('stat-chars').textContent = `${chars}文字`;
+            document.getElementById('stat-words').textContent = `${words}単語`;
+            document.getElementById('stat-lines').textContent = `${lines}行`;
+            
+            // タグ抽出
+            const tags = [...new Set((text.match(/(?:^|\s)#([a-zA-Z\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF\w]+)/g) || []).map(t => t.trim()))];
+            const tagEl = document.getElementById('stat-tags');
+            tagEl.textContent = tags.length > 0 ? `${tags.length}タグ` : '';
+        }
+
+        // ==========================================
+        // ブックマーク
+        // ==========================================
+        async function toggleBookmark() {
+            if (!currentDocId) return;
+            const bookmarks = (await dbBookmarks.getItem('list')) || [];
+            const idx = bookmarks.indexOf(currentDocId);
+            if (idx >= 0) { bookmarks.splice(idx, 1); showToast('ブックマーク解除', 'info'); }
+            else { bookmarks.push(currentDocId); showToast('ブックマークに追加', 'success'); }
+            await dbBookmarks.setItem('list', bookmarks);
+            updateBookmarkUI();
+        }
+        async function updateBookmarkUI() {
+            const bookmarks = (await dbBookmarks.getItem('list')) || [];
+            const btn = document.getElementById('btn-bookmark-toggle');
+            btn.classList.toggle('active', bookmarks.includes(currentDocId));
+        }
+
+        // ==========================================
+        // 全文検索
+        // ==========================================
+        async function performGlobalSearch(query) {
+            const resultsEl = document.getElementById('search-results');
+            if (!query.trim()) { resultsEl.innerHTML = '<p class="text-xs text-slate-400 text-center py-4">キーワードを入力してください</p>'; return; }
+            
+            const list = await dbDocList.getItem('list') || [];
+            const results = [];
+            for (const meta of list) {
+                const doc = await dbDoc.getItem(meta.id);
+                const content = doc ? doc.content : '';
+                const fullText = meta.title + '\n' + content;
+                const lowerQ = query.toLowerCase();
+                const lowerFull = fullText.toLowerCase();
+                if (lowerFull.includes(lowerQ)) {
+                    const idx = lowerFull.indexOf(lowerQ);
+                    const snippetStart = Math.max(0, idx - 40);
+                    const snippetEnd = Math.min(fullText.length, idx + query.length + 60);
+                    let snippet = fullText.substring(snippetStart, snippetEnd);
+                    if (snippetStart > 0) snippet = '...' + snippet;
+                    if (snippetEnd < fullText.length) snippet = snippet + '...';
+                    const escapedQ = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                    const highlighted = snippet.replace(new RegExp(escapedQ, 'gi'), m => `<span class="highlight">${m}</span>`);
+                    
+                    // フォルダパスを構築
+                    const path = getDocPath(meta.id, list);
+                    results.push({ id: meta.id, title: meta.title, snippet: highlighted, path });
+                }
+            }
+            if (results.length === 0) {
+                resultsEl.innerHTML = '<p class="text-xs text-slate-400 text-center py-4">結果なし</p>';
+                return;
+            }
+            resultsEl.innerHTML = results.map(r => `
+                <div class="search-result-item p-2 rounded cursor-pointer" data-id="${r.id}">
+                    <div class="flex items-center gap-1 mb-0.5">
+                        <i class="fa-regular fa-file-lines text-slate-400 text-xs"></i>
+                        <span class="text-xs font-bold text-slate-700">${r.title}</span>
+                        <span class="text-[9px] text-slate-400 ml-auto">${r.path}</span>
+                    </div>
+                    <div class="text-[11px] text-slate-500 leading-relaxed">${r.snippet}</div>
+                </div>
+            `).join('');
+            resultsEl.querySelectorAll('.search-result-item').forEach(el => {
+                el.addEventListener('click', async () => {
+                    await saveDocument();
+                    currentDocId = el.dataset.id;
+                    renderDocList(await dbDocList.getItem('list'));
+                    await loadDocument();
+                    document.getElementById('search-modal').classList.add('hidden');
+                });
+            });
+        }
+
+        function getDocPath(docId, list) {
+            const parts = [];
+            let current = list.find(d => d.id === docId);
+            while (current && current.parentId) {
+                const parent = list.find(d => d.id === current.parentId);
+                if (parent) parts.unshift(parent.title);
+                current = parent;
+            }
+            return parts.length > 0 ? parts.join(' / ') : '/';
+        }
+
+        // ==========================================
+        // クイックスイッチャー
+        // ==========================================
+        async function performQuickSwitch(query) {
+            const resultsEl = document.getElementById('quick-switch-results');
+            const list = await dbDocList.getItem('list') || [];
+            const bookmarks = (await dbBookmarks.getItem('list')) || [];
+            
+            let filtered = list;
+            if (query.trim()) {
+                const lowerQ = query.toLowerCase();
+                filtered = list.filter(d => d.title.toLowerCase().includes(lowerQ));
+            }
+            // ブックマークを先頭にソート
+            filtered.sort((a, b) => {
+                const aBook = bookmarks.includes(a.id) ? 0 : 1;
+                const bBook = bookmarks.includes(b.id) ? 0 : 1;
+                if (aBook !== bBook) return aBook - bBook;
+                return (b.updatedAt || 0) - (a.updatedAt || 0);
+            });
+            
+            if (filtered.length === 0) {
+                resultsEl.innerHTML = '<p class="text-xs text-slate-400 text-center py-4">該当なし</p>';
+                return;
+            }
+            resultsEl.innerHTML = filtered.slice(0, 20).map((d, i) => `
+                <div class="search-result-item p-2 rounded cursor-pointer flex items-center gap-2 ${i === 0 ? 'active' : ''}" data-id="${d.id}">
+                    ${bookmarks.includes(d.id) ? '<i class="fa-solid fa-star text-amber-400 text-xs"></i>' : '<i class="fa-regular fa-file-lines text-slate-400 text-xs"></i>'}
+                    <span class="text-sm text-slate-700 flex-1">${d.title}</span>
+                    <span class="text-[9px] text-slate-400">${getDocPath(d.id, list)}</span>
+                </div>
+            `).join('');
+            resultsEl.querySelectorAll('.search-result-item').forEach(el => {
+                el.addEventListener('click', async () => {
+                    await saveDocument();
+                    currentDocId = el.dataset.id;
+                    renderDocList(await dbDocList.getItem('list'));
+                    await loadDocument();
+                    document.getElementById('quick-switch-modal').classList.add('hidden');
+                });
+            });
+        }
+
+        // ==========================================
+        // バックリンク
+        // ==========================================
+        async function updateBacklinks() {
+            const list = await dbDocList.getItem('list') || [];
+            const currentMeta = list.find(d => d.id === currentDocId);
+            if (!currentMeta) return;
+            
+            const backlinkListEl = document.getElementById('backlink-list');
+            const outgoingListEl = document.getElementById('outgoing-link-list');
+            const backlinks = [];
+            const outgoing = [];
+            
+            // 現在のドキュメントの内容を取得
+            const currentDoc = await dbDoc.getItem(currentDocId);
+            const currentContent_ = currentDoc ? currentDoc.content : '';
+            
+            // アウトゴーイングリンクを抽出
+            const outgoingMatches = currentContent_.match(/\[\[([^\]]+)\]\]/g) || [];
+            const outgoingTitles = outgoingMatches.map(m => m.replace(/\[\[|\]\]/g, ''));
+            
+            for (const title of outgoingTitles) {
+                const target = list.find(d => d.title === title);
+                if (target) {
+                    outgoing.push({ id: target.id, title: target.title });
+                }
+            }
+            
+            // 全ドキュメントからバックリンクを検索
+            for (const meta of list) {
+                if (meta.id === currentDocId) continue;
+                const doc = await dbDoc.getItem(meta.id);
+                if (!doc) continue;
+                if (doc.content.includes(`[[${currentMeta.title}]]`)) {
+                    backlinks.push({ id: meta.id, title: meta.title });
+                }
+            }
+            
+            backlinkListEl.innerHTML = backlinks.length === 0 
+                ? '<p class="text-[10px] text-slate-400 italic">バックリンクなし</p>'
+                : backlinks.map(b => `<div class="backlink-item text-xs text-slate-600 flex items-center gap-1" data-id="${b.id}"><i class="fa-solid fa-arrow-left text-primary text-[10px]"></i>${b.title}</div>`).join('');
+            
+            outgoingListEl.innerHTML = outgoing.length === 0
+                ? '<p class="text-[10px] text-slate-400 italic">リンクなし</p>'
+                : outgoing.map(o => `<div class="backlink-item text-xs text-slate-600 flex items-center gap-1" data-id="${o.id}"><i class="fa-solid fa-arrow-right text-indigo-500 text-[10px]"></i>${o.title}</div>`).join('');
+            
+            // クリックイベント
+            [backlinkListEl, outgoingListEl].forEach(el => {
+                el.querySelectorAll('.backlink-item').forEach(item => {
+                    item.addEventListener('click', async () => {
+                        await saveDocument();
+                        currentDocId = item.dataset.id;
+                        renderDocList(await dbDocList.getItem('list'));
+                        await loadDocument();
+                    });
+                });
+            });
+        }
+
+        // ==========================================
+        // 検索＆置換
+        // ==========================================
+        let findMatches = [];
+        let findCurrentIdx = -1;
+
+        function showFindReplace() {
+            const bar = document.getElementById('find-replace-bar');
+            bar.classList.remove('hidden');
+            bar.classList.add('flex');
+            document.getElementById('find-input').focus();
+        }
+        function hideFindReplace() {
+            const bar = document.getElementById('find-replace-bar');
+            bar.classList.add('hidden');
+            bar.classList.remove('flex');
+            findMatches = [];
+            findCurrentIdx = -1;
+        }
+        function findInEditor() {
+            const query = document.getElementById('find-input').value;
+            if (!query) { document.getElementById('find-count').textContent = '0件'; findMatches = []; return; }
+            const text = editor.value;
+            findMatches = [];
+            const escapedQ = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const re = new RegExp(escapedQ, 'gi');
+            let m;
+            while ((m = re.exec(text)) !== null) {
+                findMatches.push({ start: m.index, end: m.index + m[0].length });
+            }
+            document.getElementById('find-count').textContent = `${findMatches.length}件`;
+            if (findMatches.length > 0) { findCurrentIdx = 0; highlightFindMatch(); }
+        }
+        function highlightFindMatch() {
+            if (findMatches.length === 0 || findCurrentIdx < 0) return;
+            const match = findMatches[findCurrentIdx];
+            editor.focus();
+            editor.setSelectionRange(match.start, match.end);
+            // スクロール位置を調整
+            const linesBefore = editor.value.substring(0, match.start).split('\n').length;
+            editor.scrollTop = (linesBefore - 3) * parseInt(window.getComputedStyle(editor).lineHeight);
+            document.getElementById('find-count').textContent = `${findCurrentIdx + 1}/${findMatches.length}`;
+        }
+        function findNext() { if (findMatches.length === 0) return; findCurrentIdx = (findCurrentIdx + 1) % findMatches.length; highlightFindMatch(); }
+        function findPrev() { if (findMatches.length === 0) return; findCurrentIdx = (findCurrentIdx - 1 + findMatches.length) % findMatches.length; highlightFindMatch(); }
+        function replaceOne() {
+            if (findMatches.length === 0 || findCurrentIdx < 0) return;
+            const match = findMatches[findCurrentIdx];
+            const replacement = document.getElementById('replace-input').value;
+            editor.value = editor.value.substring(0, match.start) + replacement + editor.value.substring(match.end);
+            editor.dispatchEvent(new Event('input'));
+            findInEditor();
+        }
+        function replaceAll() {
+            const query = document.getElementById('find-input').value;
+            const replacement = document.getElementById('replace-input').value;
+            if (!query) return;
+            const escapedQ = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            editor.value = editor.value.replace(new RegExp(escapedQ, 'gi'), replacement);
+            editor.dispatchEvent(new Event('input'));
+            findInEditor();
+            showToast('全置換完了', 'success');
+        }
+
+        // ==========================================
+        // エクスポート・共有
+        // ==========================================
+        function downloadFile(filename, content, mimeType = 'text/plain') {
+            const blob = new Blob([content], { type: mimeType });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = filename;
+            document.body.appendChild(a); a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        function exportCurrentMD() {
+            const title = docTitleInput.value.trim() || '無題';
+            const content = `# ${title}\n\n${editor.value}`;
+            downloadFile(`${title}.md`, content, 'text/markdown');
+            showToast('MDファイルをダウンロード', 'success');
+        }
+
+        function exportCurrentTXT() {
+            const title = docTitleInput.value.trim() || '無題';
+            downloadFile(`${title}.txt`, editor.value, 'text/plain');
+            showToast('TXTファイルをダウンロード', 'success');
+        }
+
+        async function shareNative() {
+            const title = docTitleInput.value.trim() || '無題';
+            const content = editor.value;
+            if (navigator.share) {
+                try {
+                    // ファイル共有を試行
+                    const file = new File([`# ${title}\n\n${content}`], `${title}.md`, { type: 'text/markdown' });
+                    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                        await navigator.share({ title, text: content.substring(0, 200), files: [file] });
+                    } else {
+                        await navigator.share({ title, text: content });
+                    }
+                    showToast('共有しました', 'success');
+                } catch (e) {
+                    if (e.name !== 'AbortError') showToast('共有エラー: ' + e.message, 'error');
+                }
+            } else {
+                // Web Share API非対応の場合、メール fallback
+                const subject = encodeURIComponent(title);
+                const body = encodeURIComponent(content);
+                window.open(`mailto:?subject=${subject}&body=${body}`, '_blank');
+                showToast('メールアプリを起動', 'info');
+            }
+        }
+
+        async function copyToClipboard() {
+            try {
+                await navigator.clipboard.writeText(editor.value);
+                showToast('クリップボードにコピー', 'success');
+            } catch (e) {
+                showToast('コピーエラー', 'error');
+            }
+        }
+
+        async function exportAllZip() {
+            const toastId = showToast('ZIPを生成中...', 'info', true);
+            try {
+                const zip = new JSZip();
+                const list = await dbDocList.getItem('list') || [];
+                
+                // フォルダ構造を構築
+                function buildPath(docId) {
+                    const parts = [];
+                    let current = list.find(d => d.id === docId);
+                    while (current) {
+                        parts.unshift(current.title.replace(/[\/\\:*?"<>|]/g, '_'));
+                        current = current.parentId ? list.find(d => d.id === current.parentId) : null;
+                    }
+                    return parts.join('/');
+                }
+                
+                for (const meta of list) {
+                    const doc = await dbDoc.getItem(meta.id);
+                    const content = doc ? doc.content : '';
+                    const hasChildren = list.some(d => d.parentId === meta.id);
+                    const path = buildPath(meta.id);
+                    
+                    if (hasChildren) {
+                        zip.file(`${path}/${meta.title.replace(/[\/\\:*?"<>|]/g, '_')}.md`, `# ${meta.title}\n\n${content}`);
+                    } else {
+                        zip.file(`${path}.md`, `# ${meta.title}\n\n${content}`);
+                    }
+                }
+                
+                const blob = await zip.generateAsync({ type: 'blob' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `AIWorkPad_${new Date().toISOString().slice(0,10)}.zip`;
+                document.body.appendChild(a); a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                removeToast(toastId);
+                showToast('ZIPエクスポート完了', 'success');
+            } catch (e) {
+                removeToast(toastId);
+                showToast('エクスポートエラー: ' + e.message, 'error');
+            }
+        }
+
+        async function exportJSON() {
+            const toastId = showToast('バックアップ生成中...', 'info', true);
+            try {
+                const data = {
+                    version: 2,
+                    exportedAt: new Date().toISOString(),
+                    docList: await dbDocList.getItem('list'),
+                    documents: {},
+                    history: {},
+                    chat: {},
+                    settings: await dbSettings.getItem('appSettings'),
+                    bookmarks: await dbBookmarks.getItem('list'),
+                };
+                const list = data.docList || [];
+                for (const meta of list) {
+                    data.documents[meta.id] = await dbDoc.getItem(meta.id);
+                }
+                const histKeys = await dbHistory.keys();
+                for (const k of histKeys) { data.history[k] = await dbHistory.getItem(k); }
+                const chatKeys = await dbChat.keys();
+                for (const k of chatKeys) { data.chat[k] = await dbChat.getItem(k); }
+
+                downloadFile(`AIWorkPad_backup_${new Date().toISOString().slice(0,10)}.json`, JSON.stringify(data, null, 2), 'application/json');
+                removeToast(toastId);
+                showToast('JSONバックアップ完了', 'success');
+            } catch (e) {
+                removeToast(toastId);
+                showToast('エラー: ' + e.message, 'error');
+            }
+        }
+
+        async function importJSON(file) {
+            const toastId = showToast('インポート中...', 'info', true);
+            try {
+                const text = await file.text();
+                const data = JSON.parse(text);
+                if (!data.docList) throw new Error('無効なバックアップファイル');
+                
+                if (!confirm(`${data.docList.length}件のドキュメントをインポートします。\n既存データは上書きされます。よろしいですか？`)) {
+                    removeToast(toastId); return;
+                }
+                
+                await dbDocList.setItem('list', data.docList);
+                for (const [id, doc] of Object.entries(data.documents || {})) { await dbDoc.setItem(id, doc); }
+                for (const [id, hist] of Object.entries(data.history || {})) { await dbHistory.setItem(id, hist); }
+                for (const [id, chat] of Object.entries(data.chat || {})) { await dbChat.setItem(id, chat); }
+                if (data.settings) await dbSettings.setItem('appSettings', data.settings);
+                if (data.bookmarks) await dbBookmarks.setItem('list', data.bookmarks);
+                
+                removeToast(toastId);
+                showToast('インポート完了！再読込します', 'success');
+                setTimeout(() => location.reload(), 1000);
+            } catch (e) {
+                removeToast(toastId);
+                showToast('インポートエラー: ' + e.message, 'error');
+            }
+        }
+
+        // ==========================================
+        // テンプレート
+        // ==========================================
+        async function showTemplateModal() {
+            const listEl = document.getElementById('template-list');
+            const today = new Date();
+            const dateStr = `${today.getFullYear()}/${(today.getMonth()+1).toString().padStart(2,'0')}/${today.getDate().toString().padStart(2,'0')}`;
+            
+            // カスタムテンプレートを読み込み
+            const customTemplates = (await dbTemplates.getItem('list')) || [];
+            const allTemplates = [...BUILTIN_TEMPLATES, ...customTemplates];
+            
+            listEl.innerHTML = allTemplates.map(t => `
+                <div class="template-item p-3 rounded-lg border border-slate-100 cursor-pointer" data-id="${t.id}">
+                    <div class="text-sm font-medium text-slate-700"><i class="fa-solid fa-stamp text-primary mr-1"></i>${t.name}</div>
+                    <div class="text-[10px] text-slate-400 mt-1 line-clamp-2">${t.content.substring(0, 80).replace(/\n/g, ' ')}...</div>
+                </div>
+            `).join('');
+            
+            listEl.querySelectorAll('.template-item').forEach(el => {
+                el.addEventListener('click', () => {
+                    const tpl = allTemplates.find(t => t.id === el.dataset.id);
+                    if (tpl) {
+                        const content = tpl.content.replace(/\{\{date\}\}/g, dateStr);
+                        insertTextAtCursor(content);
+                        document.getElementById('template-modal').classList.add('hidden');
+                        showToast('テンプレートを挿入', 'success');
+                    }
+                });
+            });
+            
+            document.getElementById('template-modal').classList.remove('hidden');
+        }
+
+        // ==========================================
+        // キーボードショートカット
+        // ==========================================
+        function setupKeyboardShortcuts() {
+            document.addEventListener('keydown', (e) => {
+                // Ctrl+O: クイックスイッチャー
+                if ((e.ctrlKey || e.metaKey) && e.key === 'o') {
+                    e.preventDefault();
+                    document.getElementById('quick-switch-modal').classList.remove('hidden');
+                    const input = document.getElementById('quick-switch-input');
+                    input.value = '';
+                    input.focus();
+                    performQuickSwitch('');
+                }
+                // Ctrl+Shift+F: 全文検索
+                if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'F') {
+                    e.preventDefault();
+                    document.getElementById('search-modal').classList.remove('hidden');
+                    const input = document.getElementById('global-search-input');
+                    input.value = '';
+                    input.focus();
+                }
+                // Ctrl+F: ドキュメント内検索＆置換
+                if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key === 'f' && document.activeElement === editor) {
+                    e.preventDefault();
+                    showFindReplace();
+                }
+                // Ctrl+S: 手動保存
+                if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+                    e.preventDefault();
+                    saveDocument(); saveVersion('manual', '手動保存');
+                    showToast('保存しました', 'save');
+                }
+                // Ctrl+N: 新規ドキュメント
+                if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
+                    e.preventDefault();
+                    createNewDocument(null);
+                }
+                // Ctrl+T: テンプレート挿入
+                if ((e.ctrlKey || e.metaKey) && e.key === 't') {
+                    e.preventDefault();
+                    showTemplateModal();
+                }
+                // Ctrl+E: プレビュー切替
+                if ((e.ctrlKey || e.metaKey) && e.key === 'e') {
+                    e.preventDefault();
+                    togglePreviewMode();
+                }
+                // ESC: モーダルを閉じる
+                if (e.key === 'Escape') {
+                    document.getElementById('search-modal').classList.add('hidden');
+                    document.getElementById('quick-switch-modal').classList.add('hidden');
+                    document.getElementById('export-modal').classList.add('hidden');
+                    document.getElementById('template-modal').classList.add('hidden');
+                    hideFindReplace();
+                }
             });
         }
 
