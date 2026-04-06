@@ -15,6 +15,19 @@
 
     <!-- SW 登録 -->
     <script>
+    // ウィジェットからのインテント処理
+    window.handleWidgetAction = function(action) {
+        console.log('[Widget] Action received:', action);
+        if (action === 'new_doc') {
+            window._widgetAction = 'new_doc';
+            // アプリ初期化完了後に新規作成を実行
+            if (typeof createNewDocument === 'function') {
+                setTimeout(() => createNewDocument(null), 300);
+            }
+        }
+    };
+    </script>
+    <script>
     (function() {
         if (!('serviceWorker' in navigator)) return;
 

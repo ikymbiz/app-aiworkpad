@@ -39,20 +39,9 @@ self.addEventListener('install', (event) => {
     console.log('[SW] Install:', CACHE_VERSION);
     event.waitUntil(
         Promise.all([
-            caches.open(APP_SHELL_CACHE).then(cache => {
-                return cache.addAll(APP_SHELL_URLS).catch(err => {
-                    console.warn('[SW] App shell cache failed (OK on first deploy):', err);
-                });
-            }),
+            caches.open(APP_SHELL_CACHE).then(cache => cache.addAll(APP_SHELL_URLS)),
             caches.open(CDN_CACHE).then(cache => {
-                // CDN は best-effort — 失敗しても install は成功させる
-                return Promise.allSettled(
-                    CDN_URLS.map(url =>
-                        cache.add(url).catch(err => {
-                            console.warn('[SW] CDN cache skip:', url, err.message);
-                        })
-                    )
-                );
+                return Promise.all(CDN_URLS.map(url => cache.add(url)));
             }),
         ]).then(() => self.skipWaiting())
     );
@@ -101,16 +90,9 @@ self.addEventListener('fetch', (event) => {
             caches.match(event.request).then(cached => {
                 if (cached) return cached;
                 return fetch(event.request).then(response => {
-                    if (response && response.ok) {
-                        const clone = response.clone();
-                        caches.open(CDN_CACHE).then(cache => cache.put(event.request, clone));
-                    }
+                    const clone = response.clone();
+                    caches.open(CDN_CACHE).then(cache => cache.put(event.request, clone));
                     return response;
-                }).catch(() => {
-                    // オフラインでキャッシュもない場合
-                    return new Response('/* offline */', {
-                        headers: { 'Content-Type': 'text/css' }
-                    });
                 });
             })
         );
@@ -120,18 +102,11 @@ self.addEventListener('fetch', (event) => {
     // 5) App Shell (HTML ナビゲーション) → Network First + Cache Fallback
     if (event.request.mode === 'navigate' || url.pathname.endsWith('.html') || url.pathname === '/' || url.pathname.endsWith('/')) {
         event.respondWith(
-            fetch(event.request)
-                .then(response => {
-                    if (response && response.ok) {
-                        const clone = response.clone();
-                        caches.open(APP_SHELL_CACHE).then(cache => cache.put(event.request, clone));
-                    }
-                    return response;
-                })
-                .catch(() => {
-                    return caches.match(event.request)
-                        .then(cached => cached || caches.match('./index.html'));
-                })
+            fetch(event.request).then(response => {
+                const clone = response.clone();
+                caches.open(APP_SHELL_CACHE).then(cache => cache.put(event.request, clone));
+                return response;
+            })
         );
         return;
     }
@@ -141,10 +116,8 @@ self.addEventListener('fetch', (event) => {
         caches.match(event.request).then(cached => {
             if (cached) return cached;
             return fetch(event.request).then(response => {
-                if (response && response.ok) {
-                    const clone = response.clone();
-                    caches.open(CDN_CACHE).then(cache => cache.put(event.request, clone));
-                }
+                const clone = response.clone();
+                caches.open(CDN_CACHE).then(cache => cache.put(event.request, clone));
                 return response;
             });
         })
